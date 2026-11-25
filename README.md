@@ -1,107 +1,184 @@
-# 虎伴 (HuyaPure)
+<div align="center">
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-3DDC84.svg)](app/build.gradle.kts)
-[![Xposed API](https://img.shields.io/badge/LSPosed%20%2F%20Xposed-API%2082-orange.svg)](app/src/main/AndroidManifest.xml)
-[![Target](https://img.shields.io/badge/Target-com.duowan.kiwi-brightgreen.svg)](app/src/main/res/values/arrays.xml)
+<img src="assets/logo.png" width="120" height="120" alt="虎伴 Logo" />
 
-**虎伴**（仓库：`UCKETX/HuyaPure`，包名：`com.huya.pure`）是一款轻量级 **LSPosed / Xposed** 模块，用于自动化虎牙每日任务与粉丝牌管理、屏蔽虎牙直播开屏与直播间广告、跳过激励视频广告直接领取虎粮，并彻底关闭虎牙后台及直播间 P2P / MiniPCDN / FileP2P 偷跑上传（不影响正常直播播放与弹幕）。
+<h1>虎伴 · HuyaPure</h1>
 
----
+<p><strong>虎牙直播纯净增强伴侣（LSPosed / Xposed 模块）</strong></p>
+<p>免开虎牙自动领虎粮与打卡 · 超粉日 4 倍亲密度智能囤粮 · 全域去广告与彻底禁用 P2P 上传</p>
 
-## 主要功能
+<p>
+  <a href="https://github.com/UCKETX/HuyaPure/releases/latest">
+    <img src="https://img.shields.io/github/v/release/UCKETX/HuyaPure?style=flat-square&color=FF6A00&label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC" alt="Latest Release" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-GPLv3-3B82F6?style=flat-square" alt="License: GPL v3" />
+  </a>
+  <a href="app/build.gradle.kts">
+    <img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-10B981?style=flat-square" alt="Android 8.0+" />
+  </a>
+  <a href="app/src/main/AndroidManifest.xml">
+    <img src="https://img.shields.io/badge/LSPosed%20%2F%20Xposed-API%2082-F59E0B?style=flat-square" alt="LSPosed API 82" />
+  </a>
+  <a href="app/src/main/res/values/arrays.xml">
+    <img src="https://img.shields.io/badge/Target-com.duowan.kiwi-6366F1?style=flat-square" alt="Target com.duowan.kiwi" />
+  </a>
+</p>
 
-1. **四页签现代化界面、全自绘弹窗 & 全新暖陶小虎图标**
-   - 全新四页签架构（`任务` / `粉丝牌` / `净化` / `关于`），搭配空心→实心动态底部导航图标、丝滑页面与卡片过渡动效、全套自绘底部菜单/时间选择器/模态弹窗及深色/浅色双主题，换装全新暖陶质感小虎应用图标。
-2. **每日定时后台自动领虎粮 + 全粉丝牌打卡 + 每日福利领取 + 超粉日智能送免费虎粮（免开虎牙）**
-   - 支持设置每日自动执行时间（默认 `08:00`）、独立勾选「粉丝牌自动打卡」「领取每日专属福利」「自动赠送免费虎粮（含超粉虎粮）」「超粉日智能囤粮」、状态栏结果通知与一键手动触发。
-   - 无需打开虎牙界面：通过 `ContentProvider.call()` 静默唤醒虎牙主进程复用当前登录态，依次完成：
-     - 包裹免费虎粮领取（`GetCommAdPannel` + `HyLotteryAdAwardManager.onAwardCommonAdTask`）；
-     - 账号下全部粉丝牌打卡（`liveui.queryBadgeInfoList` + `wupui.setFansSign`）；
-     - 每日免费福利自动领取：粉丝团专属每日福利 `10` 个虎粮（`wupui.queryFansGroupTaskInfo` + `wupui.operateFansBox`）、超粉/超级虎粮与粉丝团通用福利（`wupui.queryFGCommonWelfare`）、虎牙每日签到（`OldUserBackSign`）及已完成任务中心宝箱（`GetLiveBoxPage` + `AwardLiveBox`）；
-     - **超粉日智能囤粮 + 临期防过期兜底**：实时查询每位主播的 `SuperFansConfig` 超粉日与 4 倍亲密度配置，结合背包逐批次免费虎粮过期时间戳（`lExpireTime`），平时仅送 1 天超粉虎粮与临期批次（临期自动突破单次上限，必要时额外预约过期前 30 分钟「临期抢救闹钟」），其余留到超粉日当天集中送出吃满 4 倍亲密度；
-     - **多选目标 + 4 种分配方式**：支持自由多选多位主播（含全选/仅超粉/自定义 UID），支持**平均分配**、**优先补满今日亲密度上限**、**优先送离升级最近**、**按自定义比例分配**；严格使用 `SendGiftPayPloyUtil.PACKAGE_PAY_PLOY` 包裹免费通道（`iIsPay=0`），绝不消耗金豆与虎牙币。
-   - `任务` 页签内置三列实时统计（今日领虎粮 / 粉丝牌打卡 / 免费虎粮，支持超粉虎粮与临期提醒）、当日超粉日提醒横幅与结构化执行状态面板。
-3. **「粉丝牌」独立页签与手动送虎粮**
-   - 完整还原虎牙原生与主播**定制粉丝牌**样式，支持守护徽章（`初爱守护` / `超级守护` / `至尊守护`）、纯图标超粉 / Plus 标识、超粉日日期/倒计时标签与熄灭态，直观展示等级、总经验、升级进度条、今日亲密度与打卡状态。
-   - **点击主播快捷操作**：轻点任意粉丝牌即可查看详细数据、复制 UID，或直接手动向该主播赠送免费虎粮 / 超粉虎粮。
-4. **「净化」页签独立开关与差值感知悬浮重启条**
-   - 基于 LSPosed `XSharedPreferences` 按需独立开关每一项去广告、防 P2P 及调试日志能力，支持一键恢复默认。
-   - 修改净化开关且存在净变动时自动在底部浮出重启提示条（还原后自动收起），拥有 Root 权限时静默重启虎牙进程即刻生效，无 Root 时自动跳转系统应用详情页兜底。
-5. **「关于」页签诊断、缓存清理与应用内更新**
-   - 集中展示模块激活状态与运行诊断信息，支持一键清除粉丝牌本地缓存。
-   - 支持自动/手动检测 `UCKETX/HuyaPure` GitHub Releases 新版本，查看更新日志、应用内带进度条下载 APK 并直接调起系统安装器更新。
-6. **激励视频跳广告领虎粮**
-   - 支持包裹页「看广告赚虎粮」、膨胀弹窗「看广告立即膨胀」、宝箱及任务中心激励视频广告。
-   - 覆盖穿山甲（CSJ / Pangle）、优量汇（AMS / GDT）与虎牙自建（KA）三大广告渠道，跳过视频播放并自动完成奖励校验向服务端领奖。
-7. **屏蔽开屏与直播间广告（不影响领虎粮）**
-   - 拦截冷启动开屏、热启动开屏、延迟开屏、后台开屏资源预拉取及开屏联动横幅，启动直达首页。
-   - 屏蔽角标浮窗、大浮窗、视频浮窗、推荐浮窗、超级动画浮窗、底部/顶部横幅、商业小风车/插件、主播推广、看播赏金 RTB 及商业弹幕广告。
-8. **彻底关闭后台与直播间 P2P / MiniPCDN / FileP2P 上传**
-   - 关闭 MiniPCDN 边缘节点与 HTTP/3 QUIC / WebRTC 上传服务（实测可消除后台约 2 MB/s 偷跑上传）。
-   - 关闭 FileP2P 文件上传与后台 HeatList 热点预下载做种，消除服务端 `ignoreUploadDisable=2` 绕过。
-   - 强制直播间拉流走纯 HTTP-FLV CDN，关闭直播 P2P / XP2P / IPv6 打洞、局域网 mDNS 发现、下载 PCDN 改写与弹幕 P2P 中继（保留正常 WebSocket 弹幕）。
-9. **适配热更新**
-   - 自动监听虎牙 Tinker / Qigsaw 热更新切换 `SplitDelegateClassloader`，避免热补丁激活后模块失效。
+<p>
+  <a href="#-核心功能">核心功能</a> ·
+  <a href="#-超粉日智能囤粮与分配策略">智能调度</a> ·
+  <a href="#-安装与使用">安装使用</a> ·
+  <a href="#-兼容性说明">兼容性</a> ·
+  <a href="#-实现原理">实现原理</a> ·
+  <a href="CHANGELOG.md">更新日志</a>
+</p>
+
+</div>
 
 ---
 
-## 兼容性说明
+## ✨ 核心功能
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>⚡ 每日自动化任务（免开虎牙）</h3>
+      <ul>
+        <li><b>无界面静默唤醒</b>：通过 <code>ContentProvider.call()</code> 复用虎牙登录态，无需打开客户端界面。</li>
+        <li><b>包裹看广告领虎粮</b>：每日定时领满当日全部看广告虎粮，遇冷却自动预约补领。</li>
+        <li><b>全粉丝牌自动打卡</b>：遍历账号下所有粉丝牌完成每日亲密度打卡。</li>
+        <li><b>每日专属福利全收</b>：自动领取粉丝团每日 <code>10</code> 个虎粮、超粉/超级虎粮、通用福利、每日签到与任务宝箱。</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>❤️ 粉丝牌、守护与手动送粮</h3>
+      <ul>
+        <li><b>原汁原味粉丝牌</b>：动态还原虎牙原生与主播<b>定制粉丝牌</b>，支持<code>初爱 / 超级 / 至尊守护</code>与纯图标超粉标识。</li>
+        <li><b>超粉日实时识别</b>：自动拉取每位主播的超粉日日期、倒计时与 <b>4 倍亲密度</b>倍率，当日弹窗/横幅/通知联动提醒。</li>
+        <li><b>点击主播手动送粮</b>：轻点粉丝牌即可查看详情、复制 UID，或直接手动赠送<b>免费虎粮 / 超粉虎粮</b>。</li>
+        <li><b>安全锁定免费通道</b>：严格仅扣 <code>iIsPay=0</code> 包裹免费道具，<b>绝不消耗金豆与虎牙币</b>。</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🛡️ 全域去广告 & 彻底禁 P2P</h3>
+      <ul>
+        <li><b>激励视频跳广告领奖</b>：覆盖穿山甲（CSJ）、优量汇（AMS）与虎牙自建（KA）三渠道，免看直接发奖。</li>
+        <li><b>屏蔽开屏与直播间广告</b>：拦截冷/热启动开屏、浮窗、角标、商业风车与推广弹幕，不影响领虎粮。</li>
+        <li><b>消除后台 P2P 偷跑上传</b>：彻底关闭 MiniPCDN、FileP2P 做种与直播间 P2P/IPv6 打洞，强制纯 HTTP-FLV 播放（实测出站 UDP 归零）。</li>
+        <li><b>适配热更新</b>：自动监听 Tinker / Qigsaw 热补丁切换 ClassLoader，避免更新后失效。</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎨 现代化四页签 UI & 全自绘交互</h3>
+      <ul>
+        <li><b>四页签清晰分层</b>：<code>任务</code> / <code>粉丝牌</code> / <code>净化</code> / <code>关于</code>，支持空心→实心动态切换图标、丝滑过渡与浅色/深色双主题。</li>
+        <li><b>全套自绘弹窗与菜单</b>：自绘底部时间选择器、多选目标与比例权重面板、居中模态框与下载进度条，告别原生弹窗割裂感。</li>
+        <li><b>差值感知悬浮重启条</b>：「净化」页修改开关且存在净变动时浮出重启条，支持 Root 一键静默重启虎牙。</li>
+        <li><b>应用内检查更新</b>：对接 GitHub Releases，支持应用内查看日志、带进度条下载 APK 并直接安装。</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🎯 超粉日智能囤粮与分配策略
+
+> [!TIP]
+> **免费虎粮不浪费，超粉日 4 倍亲密度吃满！**
+> 虎伴会解析背包内**每一批次免费虎粮的精确到期时间戳**（`UserPackageItemInfo.lExpireTime`），结合每位主播的 `SuperFansConfig` 超粉日配置自动决策：
+
+| 场景 | 自动调度行为 |
+| :--- | :--- |
+| **🎉 今天就是超粉日** | 立刻将包裹内可用免费虎粮（含超粉虎粮与囤积的普通虎粮）集中送给当日超粉日主播，吃满 **4 倍亲密度与 4 倍上限**。 |
+| **📦 非超粉日 · 临期批次（≤ 36h）** | 提前送出 1 天有效期超粉虎粮与 36 小时内即将过期的普通批次（利用虎牙 FIFO 先到期先扣规则），且**临期批次自动突破单次赠送上限**，杜绝过期浪费。 |
+| **⏳ 非超粉日 · 长效批次** | 有效期能撑过下次超粉日的免费虎粮**原地囤在背包**，静候超粉日当天集中爆发。 |
+| **⏰ 临期抢救闹钟** | 若同步后发现有虎粮会在下次每日定时之前过期，自动在**到期前 30 分钟**额外预约一次后台抢救唤醒（`ACTION_EXPIRY_RESCUE_ALARM`）。 |
+
+### 多选目标与 4 种分配方式
+
+支持在「自动送免费虎粮 → **赠送目标**」中任意多选主播（快捷支持 `全选` / `仅超粉` / `清空` / `+ 自定义 UID`），并在选择多位主播时切换 4 种分配策略：
+
+| 分配方式 | 适用场景与逻辑 |
+| :--- | :--- |
+| **平均分配** | 将本次赠送的虎粮均匀分配给选中的每位主播。 |
+| **优先补满今日亲密度上限** `推荐` | 按顺序结合超粉/超粉日倍率计算当日剩余亲密度配额，先喂满前序主播，溢出自动顺延下一位，避免亲密度浪费。 |
+| **优先送离升级最近的主播** | 按粉丝牌升级所需剩余经验由少到多排序，优先集中助力最快升牌的主播。 |
+| **按自定义比例分配** | 在多选弹窗中直接微调每位主播的权重份数（实时预览百分比），采用最大余数法精确拆分。 |
+
+---
+
+## 🚀 安装与使用
+
+1. 前往 [**GitHub Releases**](https://github.com/UCKETX/HuyaPure/releases/latest) 下载最新版 `HuyaPure-vX.X.X-release.apk` 并安装（包名 `com.huya.pure`，桌面显示名 **虎伴**）。
+2. 打开 **LSPosed Manager → 模块 → 虎伴**：
+   - 开启模块总开关；
+   - 勾选作用域 **虎牙直播（`com.duowan.kiwi`）**。
+3. **强行停止**虎牙直播并重新打开使其加载模块（后续在虎伴「净化」页可一键重启虎牙）。
+4. 打开 **虎伴** App：
+   - 顶栏显示绿点 `模块已激活` 即表示就绪；
+   - 在「任务」页按需开启定时领虎粮、自动打卡、每日福利与自动送免费虎粮；
+   - 如国产系统限制后台唤醒，建议允许虎牙关联启动或授予「虎伴」Root 权限以启用无感兜底通道。
+
+> [!NOTE]
+> 自动送礼与手动送礼均严格通过虎牙包裹支付策略（`SendGiftPayPloyUtil.PACKAGE_PAY_PLOY`，`lPayCount == 0 && lNewCoinDeduction == 0`）执行，代码层面双重校验，绝不会扣减金豆或虎牙币。
+
+---
+
+## 📱 兼容性说明
 
 | 项目 | 说明 |
 | :--- | :--- |
-| 系统要求 | Android 8.0+（API 26+），已安装 LSPosed（推荐 Zygisk / JingMatrix LSPosed） |
-| 目标应用 | 虎牙直播国内正式版（`com.duowan.kiwi`） |
-| 已验证版本 | `13.5.62`（含 Tinker 热更新补丁） |
-| 其他版本 | 模块未写死版本号，且核心 Hook 点以未混淆类/方法为主，相近 `13.x` 版本通常可直接兼容；不支持极速版、TV/HD 版、国际版等非 `com.duowan.kiwi` 包名客户端 |
+| **系统要求** | Android 8.0+（API 26+），已安装 LSPosed（推荐 Zygisk / JingMatrix LSPosed） |
+| **目标应用** | 虎牙直播国内正式版（`com.duowan.kiwi`） |
+| **实机验证版本** | 虎牙 `13.5.62`（含 Tinker 热更新补丁） / Android 16 |
+| **其他版本说明** | 未硬编码版本号，核心 Hook 点与 WUP 协议结构体通用，相近 `13.x` 版本通常可直接兼容；不支持极速版、TV/HD 版与国际版 |
 
 ---
 
-## 安装与使用
+## 🔧 实现原理
 
-1. 下载或自行编译生成 APK 并安装到手机。
-2. 打开 **LSPosed Manager → 模块 → 虎伴（HuyaPure / `com.huya.pure`）**：
-   - 开启模块开关；
-   - 确认勾选作用域 **虎牙直播 (`com.duowan.kiwi`)**。
-3. **强行停止**虎牙直播并重新启动即可生效（亦可在「净化」页签点击一键重启虎牙）。
-4. 打开**虎伴** App 可在「关于」页签查看激活状态与运行诊断；在 LSPosed 日志中搜索 `HuyaPure` 可确认各组件挂载与拦截记录。
+<details>
+<summary><strong>点击展开查看核心 Hook 点与 WUP 协议细节</strong></summary>
 
----
+模块入口位于 [`HookEntry.java`](app/src/main/java/com/huya/pure/HookEntry.java)，主要包含以下子系统：
 
-## 实现原理
+#### 1. 无界面后台任务引擎（`AutoClaimEngine` / `RawWupClient`）
+- Hook `InnerAuthLoginProvider.call()` 响应无界面 Binder 指令，支持自动任务（`huya_pure_auto_claim_v1`）与单主播手动送粮（`huya_pure_manual_send_v1`）。
+- 依次调用虎牙原生 WUP / 协程服务：`GetCommAdPannel` + `HyLotteryAdAwardManager.onAwardCommonAdTask`（领虎粮）、`liveui.queryBadgeInfoList` + `wupui.setFansSign`（全粉丝牌打卡）、`wupui.queryFansGroupTaskInfo` + `wupui.operateFansBox` + `wupui.queryFGCommonWelfare` + `OldUserBackSign` + `GetLiveBoxPage/AwardLiveBox`（每日福利与签到）、`wupui.getLiveRoomProfileForAudience`（查询 `SuperFansConfig` 超粉日）、`wupui.getPackageGift`（解析免费虎粮批次与 `lExpireTime`）以及 `SendGiftService.executeSingleSend`（包裹免费送礼）。
+- 通过 `NativeBadgeRenderer` 动态读取虎牙本地 `.commonbadge` / `.privilege/guard` 资源与定制粉丝牌远程图层，**APK 内不打包任何第三方版权素材**。
 
-模块核心逻辑位于 [`HookEntry.java`](app/src/main/java/com/huya/pure/HookEntry.java)，主要包含以下模块：
+#### 2. 激励视频跳过并领奖
+- **穿山甲（CSJ / Pangle）**：Hook `HyAdManagerInner.loadPangleRewardAd` / `loadPangleRewardShopMallAd`，跳过广告展示并完整触发 `onShowRewardVideo` → `onAdPlay` → `onVideoRewardVerify(true)` → `onAdClose`。
+- **优量汇（AMS / GDT）**：Hook `HyAdManagerInner.loadAmsRewardAd`，保留真实 `passThroughData` 元数据，跳过 `TangramRewardAD.showAD()` 并触发发奖回调。
+- **虎牙自建（KA）**：Hook `VideoAdPlayFragmentDialog.showAd`，隐藏视频容器并自动完成领奖与关闭。
 
-### 1. 激励视频跳过并领取虎粮
-- **穿山甲（CSJ / Pangle）**：Hook `HyAdManagerInner.loadPangleRewardAd` / `loadPangleRewardShopMallAd`，阻止拉起广告页并依次回调 `IPangleRewardAdCallBack` 的 `onShowRewardVideo` → `onAdPlay` → `onVideoRewardVerify(true)` → `onAdClose`。
-- **优量汇（AMS / GDT）**：Hook `HyAdManagerInner.loadAmsRewardAd`，保留元数据拉取与真实 `passThroughData`，在 `IAmsAdRewardADListener.onADLoad` 中替换展示回调 `Function0`，跳过 `TangramRewardAD.showAD()` 并回调完整发奖序列。
-- **虎牙自建（KA）**：Hook `VideoAdPlayFragmentDialog.showAd`，隐藏视频容器并自动触发 `setPlayFinish(true)` → `onAdPlayComplete()` → `dismissAd()`。
-
-### 2. 屏蔽开屏与直播间广告
+#### 3. 屏蔽开屏与直播间广告
 - **开屏广告**：Hook `AdRouter`、`SplashShowStrategy`、`HyAdSplashManager`、`AdSplashModule`，并以 `AdSplashFragment` 跳转首页作为兜底。
-- **直播间广告**：开启 `HyAdModule.isNeedShieldAdInLivingRoom` 全局开关，并拦截 `RevenueModule`、`PresenterAdModule`、`AdxModule`、`RewardAdModule`、`AdBannerModule` 与 `LiveRoomFloatSuperAd`（与 `HyVideoAdModule` / `HyLotteryAdAwardManager` 严格隔离，不影响领虎粮）。
+- **直播间广告**：开启 `HyAdModule.isNeedShieldAdInLivingRoom`，拦截 `RevenueModule`、`PresenterAdModule`、`AdxModule`、`RewardAdModule`、`AdBannerModule` 与 `LiveRoomFloatSuperAd`（与激励领虎粮通道严格隔离）。
 
-### 3. 关闭后台及直播间 P2P / MiniPCDN / FileP2P 上传
-1. **热更新 ClassLoader 适配**：监听 `Application.attach`、`Application.attachBaseContext` 与 `Instrumentation.callApplicationOnCreate`，在切换为 `SplitDelegateClassloader` 后自动补装全部 Hook。
-2. **`SignalClient` 原生动态配置清洗与 RPC 拦截**：
-   - Hook `SignalClient` 纯 Java 桥接（`access$800` / `access$900`、`SignalClient$5`），并在生命周期关键节点主动通过 `nativeOnParamsConfigResult` 注入清洗后的动态配置（保留 `paramsprefs-hysdk` 中正常音视频参数，覆写 110+ 项 P2P / MiniPCDN / FileP2P / HeatList / IPv6 打洞 / mDNS 开关）。
-   - 在 `SignalClient.request` 与 `access$000` 中拦截 `/mediaui/getMediaConfig`（防止服务端未清洗配置覆盖本地开关）以及 FileP2P / HeatList / STUN / SeedProxy / MiniPCDN / PCDN 调度 RPC，放行正常登录与直播拉流鉴权。
-3. **强制直播间走纯 HTTP-FLV CDN**：
-   - Hook `HYStreamConfig`、`HYLiveStreamConfig`、`HYLivePlayerImp`、`HyStreamMessageGenerator`、`ChannelSession`、`CDNLine`、`MultiLineConfig`、`ABSLine`、`P2PMonitor`、`CloudSdkDynamicConfigModule`，将 `P2P_STREAM` / `TX_XP2P_STREAM` 强制转为 `FLV_STREAM`，强制 `isForceFlv=true`、`isSupportP2P=0`，清空 `HyStreamMessage` 的 P2P 字段并关闭原生 `ENABLE_UPLOAD` 与 `CCK_ENABLE_P2P_MODE`。
-4. **下载与弹幕 P2P 屏蔽**：Hook `KiwiDownloadComponent` 禁止 PCDN 改写；Hook `HySignalWrapper` 与 `HalImpl` 禁用弹幕 P2P 中继（保留正常 WebSocket 弹幕）。
+#### 4. 彻底关闭后台及直播间 P2P / MiniPCDN / FileP2P 上传
+- **热更新适配**：监听 `Application.attach`、`attachBaseContext` 与 `Instrumentation.callApplicationOnCreate`，在 Tinker / Qigsaw 切换 `SplitDelegateClassloader` 后自动重装全部 Hook。
+- **`SignalClient` 动态配置清洗**：通过 `nativeOnParamsConfigResult` 覆写 110+ 项 P2P / MiniPCDN（MPS / H3Server / WebRTCServer）/ FileP2P / HeatList / IPv6 打洞 / mDNS 开关，并拦截 `/mediaui/getMediaConfig` 防止服务端覆盖。
+- **强制纯 HTTP-FLV 拉流**：拦截 `HYStreamConfig`、`HYLiveStreamConfig`、`HYLivePlayerImp`、`HyStreamMessageGenerator`、`ChannelSession`、`CDNLine`、`MultiLineConfig`、`ABSLine`、`P2PMonitor`、`CloudSdkDynamicConfigModule`，将 `P2P_STREAM` / `TX_XP2P_STREAM` 强制转为 `FLV_STREAM`，关闭弹幕 P2P 中继并保留正常 WebSocket 弹幕。
+
+</details>
 
 ---
 
-## 从源码编译
+## 🛠️ 从源码编译
 
 ### 环境要求
-- JDK 17+
-- Android SDK（项目默认 `compileSdk = 37`、`buildToolsVersion = 36.0.0`，可在 [`app/build.gradle.kts`](app/build.gradle.kts) 按需调整）
+- **JDK 17+**
+- **Android SDK**（默认 `compileSdk = 37`、`buildToolsVersion = 36.0.0`，可在 [`app/build.gradle.kts`](app/build.gradle.kts) 按需调整）
 
 ### 编译与安装
 ```bash
-# 编译 Debug APK
-./gradlew assembleDebug
+# 编译 Debug / Release APK
+./gradlew assembleDebug assembleRelease
 
 # 安装到已连接的 Android 设备
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -109,17 +186,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-## 更新日志
+## 📝 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。
+完整版本变更记录请查看 [**CHANGELOG.md**](CHANGELOG.md)。
 
 ---
 
-## 免责声明
+## ⚠️ 免责声明 & 开源协议
 
-- 本项目仅供 Android 逆向技术学习、网络流量研究与个人体验优化使用。
-- 请勿将本项目用于任何商业用途、违法违规场景或恶意刷量行为，使用者需自行承担因使用本项目产生的一切风险与后果。
-
-## 开源协议
-
-本项目基于 [GNU General Public License v3.0 (GPL-3.0)](LICENSE) 开源。
+- 本项目仅供 Android 逆向技术学习、网络流量研究与个人体验优化使用；请勿用于任何商业用途、违法违规场景或恶意刷量行为，使用者需自行承担一切风险与后果。
+- 本项目基于 [**GNU General Public License v3.0 (GPL-3.0)**](LICENSE) 开源。
