@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HuyaPure</string>
+    <string name="xposed_description">屏蔽虎牙开屏与直播间广告、关闭后台P2P上传，跳过看广告赚虎粮并自动领取虎粮</string>
+</resources>

@@ -1,0 +1,2 @@
+-keep class com.huya.pure.HookEntry { *; }
+-keep class com.huya.pure.MainActivity { *; }
