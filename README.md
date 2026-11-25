@@ -26,6 +26,7 @@
 </p>
 
 <p>
+  <a href="#-界面预览">界面预览</a> ·
   <a href="#-核心功能">核心功能</a> ·
   <a href="#-超粉日智能囤粮与分配策略">智能调度</a> ·
   <a href="#-安装与使用">安装使用</a> ·
@@ -34,6 +35,34 @@
   <a href="CHANGELOG.md">更新日志</a>
 </p>
 
+</div>
+
+---
+
+## 📸 界面预览
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="25%">
+        <img src="assets/screenshots/tab_tasks.png" width="210" alt="任务总览与超粉日提醒" /><br />
+        <sub><b>任务总览 · 超粉日提醒</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="assets/screenshots/tab_badges.png" width="210" alt="粉丝牌、守护与手动送粮" /><br />
+        <sub><b>粉丝牌 · 守护与手动送粮</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="assets/screenshots/tab_purify.png" width="210" alt="广告与 P2P 净化" /><br />
+        <sub><b>广告净化 · 禁用 P2P</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="assets/screenshots/tab_about.png" width="210" alt="关于与检查更新" /><br />
+        <sub><b>关于 · 应用内更新</b></sub>
+      </td>
+    </tr>
+  </table>
+  <p><sub>截图内容均为演示数据，界面支持跟随系统自动切换浅色 / 深色主题。</sub></p>
 </div>
 
 ---
