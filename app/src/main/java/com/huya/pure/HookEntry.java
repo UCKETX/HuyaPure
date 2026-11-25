@@ -89,6 +89,7 @@ public class HookEntry implements IXposedHookLoadPackage {
             private void check(MethodHookParam param) {
                 try {
                     if (param.thisObject instanceof Context) {
+                        AutoClaimEngine.updateAppContext((Context) param.thisObject);
                         ClassLoader c = ((Context) param.thisObject).getClassLoader();
                         if (c != null) {
                             installHooksForClassLoader(c, param.method.getName());
@@ -98,6 +99,7 @@ public class HookEntry implements IXposedHookLoadPackage {
                 }
                 try {
                     if (param.args != null && param.args.length > 0 && param.args[0] instanceof Context) {
+                        AutoClaimEngine.updateAppContext((Context) param.args[0]);
                         ClassLoader c = ((Context) param.args[0]).getClassLoader();
                         if (c != null) {
                             installHooksForClassLoader(c, param.method.getName());
@@ -162,6 +164,7 @@ public class HookEntry implements IXposedHookLoadPackage {
         if (enableBgP2P || enableLiveP2P) {
             hookDisableP2PUpload(cl, enableBgP2P, enableLiveP2P);
         }
+        AutoClaimEngine.installHooks(cl);
     }
 
     private void hookSelfStatus(ClassLoader cl) {

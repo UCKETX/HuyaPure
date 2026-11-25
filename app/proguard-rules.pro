@@ -1,2 +1,5 @@
 -keep class com.huya.pure.HookEntry { *; }
+-keep class com.huya.pure.AutoClaimEngine { *; }
+-keep class com.huya.pure.AutoClaimReceiver { *; }
+-keep class com.huya.pure.UpdateFileProvider { *; }
 -keep class com.huya.pure.MainActivity { *; }

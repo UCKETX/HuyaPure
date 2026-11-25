@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <queries>
+        <package android:name="com.duowan.kiwi" />
+        <provider android:authorities="com.duowan.kiwi.InnerAuthLoginProvider" />
+    </queries>
+
     <application
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.DayNight">
+        android:theme="@style/AppTheme">
 
         <meta-data
             android:name="xposedmodule"
@@ -32,6 +47,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".AutoClaimReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="com.huya.pure.ACTION_AUTO_CLAIM_ALARM" />
+                <action android:name="com.huya.pure.ACTION_AUTO_CLAIM_RETRY" />
+                <action android:name="com.huya.pure.ACTION_EXPIRY_RESCUE_ALARM" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name=".UpdateFileProvider"
+            android:authorities="com.huya.pure.update_provider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
     </application>
 </manifest>

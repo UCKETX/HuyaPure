@@ -1,31 +1,48 @@
-# HuyaPure
+# 虎伴 (HuyaPure)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-3DDC84.svg)](app/build.gradle.kts)
 [![Xposed API](https://img.shields.io/badge/LSPosed%20%2F%20Xposed-API%2082-orange.svg)](app/src/main/AndroidManifest.xml)
 [![Target](https://img.shields.io/badge/Target-com.duowan.kiwi-brightgreen.svg)](app/src/main/res/values/arrays.xml)
 
-一个轻量级 **LSPosed / Xposed** 模块，用于屏蔽虎牙直播开屏与直播间广告、跳过激励视频广告直接领取虎粮，并彻底关闭虎牙后台及直播间 P2P / MiniPCDN / FileP2P 偷跑上传（不影响正常直播播放与弹幕）。
+**虎伴**（仓库：`UCKETX/HuyaPure`，包名：`com.huya.pure`）是一款轻量级 **LSPosed / Xposed** 模块，用于自动化虎牙每日任务与粉丝牌管理、屏蔽虎牙直播开屏与直播间广告、跳过激励视频广告直接领取虎粮，并彻底关闭虎牙后台及直播间 P2P / MiniPCDN / FileP2P 偷跑上传（不影响正常直播播放与弹幕）。
 
 ---
 
 ## 主要功能
 
-1. **激励视频跳广告领虎粮**
+1. **四页签现代化界面、全自绘弹窗 & 全新暖陶小虎图标**
+   - 全新四页签架构（`任务` / `粉丝牌` / `净化` / `关于`），搭配空心→实心动态底部导航图标、丝滑页面与卡片过渡动效、全套自绘底部菜单/时间选择器/模态弹窗及深色/浅色双主题，换装全新暖陶质感小虎应用图标。
+2. **每日定时后台自动领虎粮 + 全粉丝牌打卡 + 每日福利领取 + 超粉日智能送免费虎粮（免开虎牙）**
+   - 支持设置每日自动执行时间（默认 `08:00`）、独立勾选「粉丝牌自动打卡」「领取每日专属福利」「自动赠送免费虎粮（含超粉虎粮）」「超粉日智能囤粮」、状态栏结果通知与一键手动触发。
+   - 无需打开虎牙界面：通过 `ContentProvider.call()` 静默唤醒虎牙主进程复用当前登录态，依次完成：
+     - 包裹免费虎粮领取（`GetCommAdPannel` + `HyLotteryAdAwardManager.onAwardCommonAdTask`）；
+     - 账号下全部粉丝牌打卡（`liveui.queryBadgeInfoList` + `wupui.setFansSign`）；
+     - 每日免费福利自动领取：粉丝团专属每日福利 `10` 个虎粮（`wupui.queryFansGroupTaskInfo` + `wupui.operateFansBox`）、超粉/超级虎粮与粉丝团通用福利（`wupui.queryFGCommonWelfare`）、虎牙每日签到（`OldUserBackSign`）及已完成任务中心宝箱（`GetLiveBoxPage` + `AwardLiveBox`）；
+     - **超粉日智能囤粮 + 临期防过期兜底**：实时查询每位主播的 `SuperFansConfig` 超粉日与 4 倍亲密度配置，结合背包逐批次免费虎粮过期时间戳（`lExpireTime`），平时仅送 1 天超粉虎粮与临期批次（临期自动突破单次上限，必要时额外预约过期前 30 分钟「临期抢救闹钟」），其余留到超粉日当天集中送出吃满 4 倍亲密度；
+     - **多选目标 + 4 种分配方式**：支持自由多选多位主播（含全选/仅超粉/自定义 UID），支持**平均分配**、**优先补满今日亲密度上限**、**优先送离升级最近**、**按自定义比例分配**；严格使用 `SendGiftPayPloyUtil.PACKAGE_PAY_PLOY` 包裹免费通道（`iIsPay=0`），绝不消耗金豆与虎牙币。
+   - `任务` 页签内置三列实时统计（今日领虎粮 / 粉丝牌打卡 / 免费虎粮，支持超粉虎粮与临期提醒）、当日超粉日提醒横幅与结构化执行状态面板。
+3. **「粉丝牌」独立页签与手动送虎粮**
+   - 完整还原虎牙原生与主播**定制粉丝牌**样式，支持守护徽章（`初爱守护` / `超级守护` / `至尊守护`）、纯图标超粉 / Plus 标识、超粉日日期/倒计时标签与熄灭态，直观展示等级、总经验、升级进度条、今日亲密度与打卡状态。
+   - **点击主播快捷操作**：轻点任意粉丝牌即可查看详细数据、复制 UID，或直接手动向该主播赠送免费虎粮 / 超粉虎粮。
+4. **「净化」页签独立开关与差值感知悬浮重启条**
+   - 基于 LSPosed `XSharedPreferences` 按需独立开关每一项去广告、防 P2P 及调试日志能力，支持一键恢复默认。
+   - 修改净化开关且存在净变动时自动在底部浮出重启提示条（还原后自动收起），拥有 Root 权限时静默重启虎牙进程即刻生效，无 Root 时自动跳转系统应用详情页兜底。
+5. **「关于」页签诊断、缓存清理与应用内更新**
+   - 集中展示模块激活状态与运行诊断信息，支持一键清除粉丝牌本地缓存。
+   - 支持自动/手动检测 `UCKETX/HuyaPure` GitHub Releases 新版本，查看更新日志、应用内带进度条下载 APK 并直接调起系统安装器更新。
+6. **激励视频跳广告领虎粮**
    - 支持包裹页「看广告赚虎粮」、膨胀弹窗「看广告立即膨胀」、宝箱及任务中心激励视频广告。
    - 覆盖穿山甲（CSJ / Pangle）、优量汇（AMS / GDT）与虎牙自建（KA）三大广告渠道，跳过视频播放并自动完成奖励校验向服务端领奖。
-2. **屏蔽开屏广告**
+7. **屏蔽开屏与直播间广告（不影响领虎粮）**
    - 拦截冷启动开屏、热启动开屏、延迟开屏、后台开屏资源预拉取及开屏联动横幅，启动直达首页。
-3. **屏蔽直播间广告（不影响领虎粮）**
    - 屏蔽角标浮窗、大浮窗、视频浮窗、推荐浮窗、超级动画浮窗、底部/顶部横幅、商业小风车/插件、主播推广、看播赏金 RTB 及商业弹幕广告。
-4. **彻底关闭后台与直播间 P2P / MiniPCDN / FileP2P 上传**
+8. **彻底关闭后台与直播间 P2P / MiniPCDN / FileP2P 上传**
    - 关闭 MiniPCDN 边缘节点与 HTTP/3 QUIC / WebRTC 上传服务（实测可消除后台约 2 MB/s 偷跑上传）。
    - 关闭 FileP2P 文件上传与后台 HeatList 热点预下载做种，消除服务端 `ignoreUploadDisable=2` 绕过。
    - 强制直播间拉流走纯 HTTP-FLV CDN，关闭直播 P2P / XP2P / IPv6 打洞、局域网 mDNS 发现、下载 PCDN 改写与弹幕 P2P 中继（保留正常 WebSocket 弹幕）。
-5. **适配热更新**
+9. **适配热更新**
    - 自动监听虎牙 Tinker / Qigsaw 热更新切换 `SplitDelegateClassloader`，避免热补丁激活后模块失效。
-6. **独立功能开关**
-   - 内置简洁设置界面（基于 LSPosed `XSharedPreferences`），可按需独立开关每一项功能及详细调试日志，支持一键恢复默认。
 
 ---
 
@@ -43,11 +60,11 @@
 ## 安装与使用
 
 1. 下载或自行编译生成 APK 并安装到手机。
-2. 打开 **LSPosed Manager → 模块 → HuyaPure**：
+2. 打开 **LSPosed Manager → 模块 → 虎伴（HuyaPure / `com.huya.pure`）**：
    - 开启模块开关；
    - 确认勾选作用域 **虎牙直播 (`com.duowan.kiwi`)**。
-3. **强行停止**虎牙直播并重新启动即可生效。
-4. 打开本模块 App 可查看激活状态；在 LSPosed 日志中搜索 `HuyaPure` 可确认各组件挂载与拦截记录。
+3. **强行停止**虎牙直播并重新启动即可生效（亦可在「净化」页签点击一键重启虎牙）。
+4. 打开**虎伴** App 可在「关于」页签查看激活状态与运行诊断；在 LSPosed 日志中搜索 `HuyaPure` 可确认各组件挂载与拦截记录。
 
 ---
 
