@@ -15,6 +15,13 @@
 keystore.properties
 .env
 .env.*
+!.env.example
+
+# Go Server build & runtime state
+/server/huban-server
+/server/HuyaPure-server
+/server/HuyaPure-server.exe
+/server/data/
 
 # IDE & Editor files
 /.idea/

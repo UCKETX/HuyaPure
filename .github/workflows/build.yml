@@ -1,19 +1,46 @@
-name: Android CI
+name: Build & Release
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: '发布到 GitHub Releases（需填写 release_tag）'
+        type: boolean
+        default: false
+      release_tag:
+        description: '手动发布版本号（如 v1.6.0，仅勾选发布时生效）'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  build:
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve Version Tag
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.release_tag }}" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -24,12 +51,276 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Prepare Release Signing (if secrets configured)
+        id: sign
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true) }}
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD" && -n "$KEY_ALIAS" && -n "$KEY_PASSWORD" ]]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+            cat <<EOF > keystore.properties
+          storeFile=release.keystore
+          storePassword=${KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEY_PASSWORD}
+          EOF
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$IS_RELEASE" == "true" ]]; then
+            echo "::error::Release build requires KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD secrets."
+            exit 1
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Upload Debug APK
+      - name: Build APK
+        run: |
+          mkdir -p dist/android
+          TAG="${{ steps.ver.outputs.tag }}"
+          if [[ "${{ steps.sign.outputs.signed }}" == "true" ]]; then
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk "dist/android/HuyaPure-${TAG}-release.apk"
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "dist/android/HuyaPure-${TAG}-debug.apk"
+          fi
+          ls -lh dist/android/
+
+      - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HuyaPure-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: android-apk
+          path: dist/android/*.apk
           if-no-files-found: error
+
+  build-server:
+    name: Build Server (Linux / macOS / Windows · amd64 & arm64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Version Tag
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.release_tag }}" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.mod
+
+      - name: Vet & Test Server
+        working-directory: server
+        run: |
+          go vet ./...
+          go test -count=1 ./...
+
+      - name: Cross-Compile 6 Platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          VER_STR="${TAG#v}-server"
+          OUT_DIR="${GITHUB_WORKSPACE}/dist/server"
+          mkdir -p "$OUT_DIR"
+
+          TARGETS=(
+            "linux amd64"
+            "linux arm64"
+            "darwin amd64"
+            "darwin arm64"
+            "windows amd64"
+            "windows arm64"
+          )
+
+          for target in "${TARGETS[@]}"; do
+            read -r GOOS GOARCH <<< "$target"
+            EXT=""
+            if [[ "$GOOS" == "windows" ]]; then
+              EXT=".exe"
+            fi
+
+            STAGE_DIR="$(mktemp -d)"
+            BIN_NAME="HuyaPure-server${EXT}"
+            echo "Building ${GOOS}/${GOARCH} -> ${BIN_NAME} (version=${VER_STR})"
+
+            (
+              cd server
+              CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+                go build -trimpath \
+                -ldflags="-s -w -X main.Version=${VER_STR}" \
+                -o "${STAGE_DIR}/${BIN_NAME}" \
+                ./cmd/huban-server
+            )
+
+            cp README.md "${STAGE_DIR}/README.md"
+            cp LICENSE "${STAGE_DIR}/LICENSE"
+
+            ARCHIVE_BASE="HuyaPure-server-${TAG}-${GOOS}-${GOARCH}"
+            if [[ "$GOOS" == "windows" ]]; then
+              (cd "$STAGE_DIR" && zip -q "${OUT_DIR}/${ARCHIVE_BASE}.zip" "${BIN_NAME}" README.md LICENSE)
+            else
+              tar -C "$STAGE_DIR" -czf "${OUT_DIR}/${ARCHIVE_BASE}.tar.gz" "${BIN_NAME}" README.md LICENSE
+            fi
+            rm -rf "$STAGE_DIR"
+          done
+
+          ls -lh "$OUT_DIR"
+
+      - name: Upload Server Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HuyaPure-server-binaries
+          path: dist/server/*
+          if-no-files-found: error
+
+  build-docker:
+    name: Build & Push Docker Image (amd64 & arm64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Version & Image Name
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            IS_RELEASE="true"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.publish_release }}" == "true" && -n "${{ inputs.release_tag }}" ]]; then
+            TAG="${{ inputs.release_tag }}"
+            IS_RELEASE="true"
+          else
+            TAG="dev-${GITHUB_SHA::7}"
+            IS_RELEASE="false"
+          fi
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}-server"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "ver=${TAG#v}-server" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "is_release=${IS_RELEASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: steps.meta.outputs.is_release == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.meta.outputs.is_release == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Multi-Arch Image (Release)
+        if: steps.meta.outputs.is_release == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          build-args: |
+            VERSION=${{ steps.meta.outputs.ver }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.tag }}
+
+      - name: Verify Docker Build (Non-Release)
+        if: steps.meta.outputs.is_release != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          platforms: linux/amd64
+          push: false
+          build-args: |
+            VERSION=${{ steps.meta.outputs.ver }}
+
+      - name: Generate Release docker-compose.yml
+        shell: bash
+        run: |
+          mkdir -p dist/docker
+          cat <<EOF > dist/docker/docker-compose.yml
+          services:
+            huyapure-server:
+              image: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+              container_name: huyapure-server
+              restart: unless-stopped
+              ports:
+                - "8686:8686"
+              environment:
+                - TZ=Asia/Shanghai
+                - HUBAN_ADDR=:8686
+                - HUBAN_DATA_DIR=/data
+                # 可选：公网部署时强烈建议设置访问密码
+                # - HUBAN_PASSWORD=your_strong_password
+              volumes:
+                - ./data:/data
+          EOF
+          cat dist/docker/docker-compose.yml
+
+      - name: Upload Docker Compose Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HuyaPure-docker-compose
+          path: dist/docker/docker-compose.yml
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [ build-android, build-server, build-docker ]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.release_tag != '')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release-assets
+
+      - name: Download Server Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: HuyaPure-server-binaries
+          path: release-assets
+
+      - name: Download Docker Compose File
+        uses: actions/download-artifact@v4
+        with:
+          name: HuyaPure-docker-compose
+          path: release-assets
+
+      - name: Generate Checksums
+        working-directory: release-assets
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          name: 虎伴 HuyaPure ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          generate_release_notes: true
+          files: release-assets/*

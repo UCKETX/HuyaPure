@@ -1,0 +1,15 @@
+services:
+  huyapure-server:
+    build: .
+    container_name: huyapure-server
+    restart: unless-stopped
+    ports:
+      - "8686:8686"
+    environment:
+      - TZ=Asia/Shanghai
+      - HUBAN_ADDR=:8686
+      - HUBAN_DATA_DIR=/data
+      # 可选：公网部署时强烈建议设置访问密码
+      # - HUBAN_PASSWORD=your_strong_password
+    volumes:
+      - ./data:/data

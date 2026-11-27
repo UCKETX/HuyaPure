@@ -531,13 +531,14 @@ public final class AutoClaimScheduler {
         boolean doFansCheckin = wantCheckin && !isCooldownRetry;
         boolean doClaimWelfare = wantClaimWelfare && !isCooldownRetry;
         boolean doSendHuliang = wantSendHuliang && !isCooldownRetry;
-        boolean doSendSuperHuliang = wantSendSuperHuliang && doSendHuliang;
+        boolean doSendSuperHuliang = wantSendSuperHuliang && !isCooldownRetry;
 
         String requestId = UUID.randomUUID().toString();
         String progressText;
-        if (doFansCheckin && doSendHuliang) {
+        boolean anySend = doSendHuliang || doSendSuperHuliang;
+        if (doFansCheckin && anySend) {
             progressText = "正在后台领虎粮、粉丝牌打卡、领福利并赠送免费虎粮...";
-        } else if (doSendHuliang) {
+        } else if (anySend) {
             progressText = "正在后台领虎粮、领福利并赠送免费虎粮...";
         } else if (doFansCheckin || doClaimWelfare) {
             progressText = "正在后台领虎粮、粉丝牌打卡并领取每日福利...";

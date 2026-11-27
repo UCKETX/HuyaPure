@@ -746,7 +746,7 @@ final class AutoClaimEngine {
             final AtomicBoolean settled,
             final ManualSendFinishCallback finish
     ) {
-        queryBagHuliang(cl, new BagHuliangCallback() {
+        queryBagHuliang(cl, sendTargetPid, new BagHuliangCallback() {
             @Override
             public void onSuccess(final BagHuliangSummary bag) {
                 if (settled.get()) {
@@ -2093,14 +2093,54 @@ final class AutoClaimEngine {
 
         // ── Phase 3: Query backpack free 虎粮 & optionally auto-send ─────────
 
+        private long firstSuperFanPid() {
+            List<BadgeTarget> sfBadges = findSuperFanBadges();
+            if (!sfBadges.isEmpty()) {
+                return sfBadges.get(0).pid;
+            }
+            return 0L;
+        }
+
         private void startFreeHuliangPhase() {
             if (finished) {
                 return;
             }
-            log("Phase 3 (免费虎粮): querying backpack via wupui.getPackageGift (doSend="
-                    + doSendHuliang + ", doSendSuper=" + doSendSuperHuliang
+            if (badgeTargets.isEmpty()) {
+                // Load badges first so we know SuperFan anchor PIDs — Huya hides 超粉虎粮 (itemType=20699)
+                // when wupui.getPackageGift is called with lPid=0.
+                queryAllFanBadges(cl, new BadgeListCallback() {
+                    @Override
+                    public void onSuccess(List<BadgeTarget> badges) {
+                        if (finished) {
+                            return;
+                        }
+                        badgeTargets.clear();
+                        badgeTargets.addAll(badges);
+                        runBagQueryAndSend();
+                    }
+
+                    @Override
+                    public void onError(String reason) {
+                        if (finished) {
+                            return;
+                        }
+                        runBagQueryAndSend();
+                    }
+                });
+                return;
+            }
+            runBagQueryAndSend();
+        }
+
+        private void runBagQueryAndSend() {
+            if (finished) {
+                return;
+            }
+            long sfHintPid = firstSuperFanPid();
+            log("Phase 3 (免费虎粮): querying backpack via wupui.getPackageGift (lPid=" + sfHintPid
+                    + ", doSend=" + doSendHuliang + ", doSendSuper=" + doSendSuperHuliang
                     + ", smartSfDay=" + smartSuperFanDaySend + ")");
-            queryBagHuliang(cl, new BagHuliangCallback() {
+            queryBagHuliang(cl, sfHintPid, new BagHuliangCallback() {
                 @Override
                 public void onSuccess(BagHuliangSummary bag) {
                     if (finished) {
@@ -2118,11 +2158,11 @@ final class AutoClaimEngine {
                             + ", batches=" + bag.normalBatches.size()
                             + "), superFree=" + bag.superFreeCount
                             + " (types=" + bag.superItems.size() + ", name=" + bag.superDisplayName + ")");
-                    if (!doSendHuliang) {
+                    if (!doSendHuliang && !doSendSuperHuliang) {
                         refreshBadgesIfNeededAndFinalize();
                         return;
                     }
-                    int availableToSend = bag.normalFreeCount
+                    int availableToSend = (doSendHuliang ? bag.normalFreeCount : 0)
                             + (doSendSuperHuliang ? bag.superFreeCount : 0);
                     if (availableToSend <= 0) {
                         sendSummary = "背包暂无免费虎粮";
@@ -2145,38 +2185,8 @@ final class AutoClaimEngine {
                         }
                         executeSendPlans(planResult, 0, new LinkedHashMap<>(), new ArrayList<>());
                     } else {
-                        queryAllFanBadges(cl, new BadgeListCallback() {
-                            @Override
-                            public void onSuccess(List<BadgeTarget> badges) {
-                                if (finished) {
-                                    return;
-                                }
-                                badgeTargets.clear();
-                                badgeTargets.addAll(badges);
-                                SendPlanResult planResult = buildAllSendPlans(bag);
-                                smartHoardedCount = planResult.hoardedNormalCount;
-                                if (planResult.plans.isEmpty()) {
-                                    if (planResult.smartHoarding && planResult.hoardedNormalCount > 0) {
-                                        sendSummary = "已囤 " + planResult.hoardedNormalCount + " 个等 "
-                                                + formatMonthDay(planResult.nearestSfDayEpoch) + " 超粉日（4倍）";
-                                    } else {
-                                        sendSummary = "无粉丝牌且未指定目标主播";
-                                    }
-                                    finalizeAll();
-                                    return;
-                                }
-                                executeSendPlans(planResult, 0, new LinkedHashMap<>(), new ArrayList<>());
-                            }
-
-                            @Override
-                            public void onError(String reason) {
-                                if (finished) {
-                                    return;
-                                }
-                                sendSummary = "获取送礼目标失败（" + reason + "）";
-                                finalizeAll();
-                            }
-                        });
+                        sendSummary = "无粉丝牌且未指定目标主播";
+                        finalizeAll();
                     }
                 }
 
@@ -2186,7 +2196,7 @@ final class AutoClaimEngine {
                         return;
                     }
                     log("Phase 3: queryBagHuliang failed: " + reason);
-                    if (doSendHuliang) {
+                    if (doSendHuliang || doSendSuperHuliang) {
                         sendSummary = "查询背包失败（" + reason + "）";
                     }
                     refreshBadgesIfNeededAndFinalize();
@@ -2263,6 +2273,21 @@ final class AutoClaimEngine {
             long nowSec = bag.serverTimeSec > 0L ? bag.serverTimeSec : (System.currentTimeMillis() / 1000L);
             List<BadgeTarget> normalTargets = resolveSelectedTargets(false);
             List<BadgeTarget> superTargets = resolveSelectedTargets(true);
+            // Huya restricts 超粉虎粮 (itemType=20699) to anchors where the user is a SuperFan.
+            // If selected targets contain no SuperFan anchor, fall back to the account's SuperFan badges.
+            boolean hasSfInSuperTargets = false;
+            for (BadgeTarget b : superTargets) {
+                if (b != null && b.superFan) {
+                    hasSfInSuperTargets = true;
+                    break;
+                }
+            }
+            if (!hasSfInSuperTargets) {
+                List<BadgeTarget> sfBadges = findSuperFanBadges();
+                if (!sfBadges.isEmpty()) {
+                    superTargets = sfBadges;
+                }
+            }
 
             if (smartSuperFanDaySend && !normalTargets.isEmpty()) {
                 List<BadgeTarget> activeSfBadges = new ArrayList<>();
@@ -2301,7 +2326,7 @@ final class AutoClaimEngine {
                             remainingCap -= countToSend;
                         }
                     }
-                    if (bag.normalFreeCount > 0 && remainingCap > 0) {
+                    if (doSendHuliang && bag.normalFreeCount > 0 && remainingCap > 0) {
                         int countToSend = Math.min(bag.normalFreeCount, remainingCap);
                         plans.addAll(buildDistributedPlansForItem(
                                 bag.normalItemType, bag.normalName, false, activeSfBadges, countToSend));
@@ -2334,14 +2359,18 @@ final class AutoClaimEngine {
 
                     // 2b. Normal free Huliang: rescue ALL batches expiring within safety horizon (36h) AND before SF day (+12h),
                     //     bypassing sendMaxCount so expiring Huliang is never truncated and wasted.
-                    long safetyHorizonSec = nowSec + 36L * 3600L;
-                    long effectiveDeadline = Math.min(safetyHorizonSec, sfDayWindowSec);
-                    int expiringToSend = bag.countNormalExpiringBy(effectiveDeadline);
-                    if (expiringToSend > 0) {
-                        plans.addAll(buildDistributedPlansForItem(
-                                bag.normalItemType, bag.normalName, false, normalTargets, expiringToSend));
+                    int expiringToSend = 0;
+                    int hoarded = 0;
+                    if (doSendHuliang) {
+                        long safetyHorizonSec = nowSec + 36L * 3600L;
+                        long effectiveDeadline = Math.min(safetyHorizonSec, sfDayWindowSec);
+                        expiringToSend = bag.countNormalExpiringBy(effectiveDeadline);
+                        if (expiringToSend > 0) {
+                            plans.addAll(buildDistributedPlansForItem(
+                                    bag.normalItemType, bag.normalName, false, normalTargets, expiringToSend));
+                        }
+                        hoarded = Math.max(0, bag.normalFreeCount - expiringToSend);
                     }
-                    int hoarded = Math.max(0, bag.normalFreeCount - expiringToSend);
                     log("SmartSuperFanDay Case 2 (HOARD): nearestSfDay=" + formatMonthDay(nearestSfDayEpoch)
                             + " (epoch=" + nearestSfDayEpoch + "), normalFree=" + bag.normalFreeCount
                             + ", expiringToSend=" + expiringToSend + ", hoarded=" + hoarded
@@ -2376,7 +2405,7 @@ final class AutoClaimEngine {
             }
 
             // 2. Normal free 虎粮: send at least all batches expiring within 36h even if above sendMaxCount.
-            if (bag.normalFreeCount > 0 && !normalTargets.isEmpty()) {
+            if (doSendHuliang && bag.normalFreeCount > 0 && !normalTargets.isEmpty()) {
                 int urgentNormal = bag.countNormalExpiringBy(urgentHorizonSec);
                 int regularCap = remainingCap > 0 ? Math.min(bag.normalFreeCount, remainingCap) : 0;
                 int countToSend = Math.min(bag.normalFreeCount, Math.max(regularCap, urgentNormal));
@@ -2607,7 +2636,7 @@ final class AutoClaimEngine {
                         + ", sentSuper=" + sentSuperHuliangCount + ", summary=" + sendSummary);
                 if (totalSent > 0) {
                     // Refresh remaining free & super 虎粮 count + updated badge exp/levels.
-                    queryBagHuliang(cl, new BagHuliangCallback() {
+                    queryBagHuliang(cl, firstSuperFanPid(), new BagHuliangCallback() {
                         @Override
                         public void onSuccess(BagHuliangSummary bag) {
                             freeHuliangCount = bag.normalFreeCount;
@@ -3323,6 +3352,10 @@ final class AutoClaimEngine {
     }
 
     private static void queryBagHuliang(ClassLoader cl, final BagHuliangCallback cb) {
+        queryBagHuliang(cl, 0L, cb);
+    }
+
+    private static void queryBagHuliang(ClassLoader cl, long hintPid, final BagHuliangCallback cb) {
         try {
             Object userId = getHuyaUserId(cl);
             if (userId == null) {
@@ -3346,7 +3379,7 @@ final class AutoClaimEngine {
 
             Object req = XposedHelpers.newInstance(reqClass);
             XposedHelpers.setObjectField(req, "tId", userId);
-            XposedHelpers.setLongField(req, "lPid", 0L);
+            XposedHelpers.setLongField(req, "lPid", Math.max(0L, hintPid));
 
             Constructor<?> ctor = taskClass.getDeclaredConstructor(reqClass);
             ctor.setAccessible(true);
@@ -3458,6 +3491,9 @@ final class AutoClaimEngine {
                             if (cnt > 0L) {
                                 freeCnt += cnt;
                                 long expireSec = readUnsignedExpireTimeSec(sub, "lExpireTime");
+                                if (expireSec <= 0L) {
+                                    expireSec = readUnsignedExpireTimeSec(sub, "lMinSecond");
+                                }
                                 itemFreeBatches.add(new FreeHuliangBatch(
                                         (int) Math.min(Integer.MAX_VALUE, cnt), expireSec));
                                 if (expireSec > 0L
