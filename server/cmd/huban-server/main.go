@@ -19,7 +19,7 @@ import (
 	"github.com/UCKETX/HuyaPure/server/internal/web"
 )
 
-var Version = "1.5.0-server"
+var Version = "1.6.0-server"
 
 func main() {
 	var (

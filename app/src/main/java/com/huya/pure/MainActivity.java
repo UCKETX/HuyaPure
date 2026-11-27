@@ -1049,7 +1049,7 @@ public class MainActivity extends Activity {
         badgeRow.setLayoutParams(brLp);
 
         String verName = getAppVersionName();
-        TextView verPill = createPill(verName.isEmpty() ? "v1.5.0" : verName, cBrandText, cBrandTintBg, 11.5f, true);
+        TextView verPill = createPill(verName.isEmpty() ? "v1.6.0" : verName, cBrandText, cBrandTintBg, 11.5f, true);
         badgeRow.addView(verPill);
 
         TextView actPill = createPill(

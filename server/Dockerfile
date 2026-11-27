@@ -1,7 +1,7 @@
 # Stage 1: Build static Go binary
 FROM golang:1.24-alpine AS builder
 
-ARG VERSION=1.5.0-server
+ARG VERSION=1.6.0-server
 
 WORKDIR /src
 COPY go.mod ./
