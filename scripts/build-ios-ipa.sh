@@ -35,7 +35,7 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
   AD_HOC_CODE_SIGNING_ALLOWED=YES \
-  "${EXTRA_BUILD_ARGS[@]}" \
+  ${EXTRA_BUILD_ARGS[@]+"${EXTRA_BUILD_ARGS[@]}"} \
   build
 
 APP_PATH="${DERIVED_DIR}/Build/Products/Release-iphoneos/HubanMobile.app"
