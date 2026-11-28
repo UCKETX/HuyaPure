@@ -169,13 +169,20 @@ public final class AppUpdater {
                         continue;
                     }
                     String name = asset.optString("name", "");
+                    String lowerName = name.toLowerCase(Locale.US);
                     String url = asset.optString("browser_download_url", "");
-                    if (name.endsWith(".apk") && !url.isEmpty()) {
+                    // Match LSPosed module APK (HuyaPure-vX.Y.Z-lsposed.apk or legacy HuyaPure-vX.Y.Z-release.apk)
+                    if (lowerName.endsWith(".apk")
+                            && !lowerName.contains("android")
+                            && !lowerName.contains("mobile")
+                            && !url.isEmpty()) {
                         apkName = name;
                         apkUrl = url;
                         apkSize = asset.optLong("size", 0L);
-                        // Prefer release-signed APK if multiple APKs exist
-                        if (name.toLowerCase(Locale.US).contains("release")) {
+                        if (lowerName.contains("lsposed") && !lowerName.contains("debug")) {
+                            break;
+                        }
+                        if (lowerName.contains("release")) {
                             break;
                         }
                     }
@@ -219,7 +226,7 @@ public final class AppUpdater {
                     throw new IOException("无法解析最新版本标签");
                 }
                 String ver = normalizeVersion(tag);
-                String apkName = "HuyaPure-" + tag + "-release.apk";
+                String apkName = "HuyaPure-" + tag + "-lsposed.apk";
                 String apkUrl = "https://github.com/" + GITHUB_REPO + "/releases/download/" + tag + "/" + apkName;
                 boolean hasUpdate = compareVersions(ver, currentVersion) > 0;
                 return new ReleaseInfo(

@@ -318,10 +318,44 @@ func (c *MobileAuthClient) callUDB(ctx context.Context, path, fn string, reqBody
 	return nil, lastErr
 }
 
+func isDirectRespHeader(sv *jce.StructView) bool {
+	if sv == nil {
+		return false
+	}
+	if _, ok := sv.Fields[3]; ok {
+		return true
+	}
+	if _, ok := sv.Fields[4]; ok {
+		return true
+	}
+	if _, ok := sv.Fields[5]; ok {
+		return true
+	}
+	if _, ok := sv.Fields[1].(string); ok {
+		return true
+	}
+	if _, ok := sv.Fields[2].(string); ok {
+		return true
+	}
+	if _, ok := sv.Fields[0].(int64); ok {
+		return true
+	}
+	return false
+}
+
 func checkUDBRespHeader(sv *jce.StructView) error {
+	if sv == nil {
+		return fmt.Errorf("UDB 响应为空")
+	}
 	rh := sv.GetStruct(0)
 	if rh == nil {
-		return fmt.Errorf("UDB 响应缺少状态头")
+		// Some UDB endpoints (such as /open/sms/login/code) return RespHeader directly
+		// as the top-level response struct, or omit all default-zero fields on success.
+		if len(sv.Fields) == 0 || isDirectRespHeader(sv) {
+			rh = sv
+		} else {
+			return fmt.Errorf("UDB 响应缺少状态头")
+		}
 	}
 	code := rh.GetInt(3, 0)
 	if code == 0 {

@@ -48,6 +48,19 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Go (for Android standalone Go core)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.mod
+
+      - name: Build Android Standalone Go Core
+        shell: bash
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          chmod +x scripts/build-android-core.sh
+          ./scripts/build-android-core.sh "${TAG#v}-mobile"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -76,24 +89,67 @@ jobs:
             echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build APK
+      - name: Build Android APKs (Android App + LSPosed Module)
         run: |
           mkdir -p dist/android
           TAG="${{ steps.ver.outputs.tag }}"
           if [[ "${{ steps.sign.outputs.signed }}" == "true" ]]; then
-            ./gradlew assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk "dist/android/HuyaPure-${TAG}-release.apk"
+            ./gradlew :app:assembleRelease :mobile-android:assembleRelease --no-daemon
+            cp mobile-android/build/outputs/apk/release/mobile-android-release.apk "dist/android/HuyaPure-${TAG}-android.apk"
+            cp app/build/outputs/apk/release/app-release.apk "dist/android/HuyaPure-${TAG}-lsposed.apk"
           else
-            ./gradlew assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk "dist/android/HuyaPure-${TAG}-debug.apk"
+            ./gradlew :app:assembleDebug :mobile-android:assembleDebug --no-daemon
+            cp mobile-android/build/outputs/apk/debug/mobile-android-debug.apk "dist/android/HuyaPure-${TAG}-android-debug.apk"
+            cp app/build/outputs/apk/debug/app-debug.apk "dist/android/HuyaPure-${TAG}-lsposed-debug.apk"
           fi
           ls -lh dist/android/
 
-      - name: Upload Android APK Artifact
+      - name: Upload Android APK Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: dist/android/*.apk
+          if-no-files-found: error
+
+  build-ios:
+    name: Build iOS Standalone IPA (Unsigned)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Version Tag
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.release_tag }}" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.mod
+
+      - name: Build HubanCore.xcframework & Unsigned IPA
+        shell: bash
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          chmod +x scripts/build-ios-xcframework.sh scripts/build-ios-ipa.sh
+          ./scripts/build-ios-xcframework.sh
+          ./scripts/build-ios-ipa.sh "${TAG}"
+
+      - name: Upload iOS IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: mobile-ios/build/HuyaPure-*-ios-unsigned.ipa
           if-no-files-found: error
 
   build-server:
@@ -288,15 +344,24 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [ build-android, build-server, build-docker ]
+    needs: [ build-android, build-ios, build-server, build-docker ]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.release_tag != '')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Android APK
+      - name: Checkout (for CHANGELOG.md)
+        uses: actions/checkout@v4
+
+      - name: Download Android APKs
         uses: actions/download-artifact@v4
         with:
           name: android-apk
+          path: release-assets
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
           path: release-assets
 
       - name: Download Server Binaries
@@ -317,10 +382,54 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Generate Release Body
+        shell: bash
+        run: |
+          TAG="${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}"
+          CHANGELOG_SECTION=""
+          if [[ -f CHANGELOG.md ]]; then
+            CHANGELOG_SECTION="$(awk -v tag="$TAG" '
+              $0 ~ "^##[[:space:]]+" tag "([[:space:]]|$)" { found=1; next }
+              found && /^##[[:space:]]+/ { exit }
+              found { print }
+            ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
+          fi
+
+          : > release-notes.md
+          if [[ -n "$CHANGELOG_SECTION" ]]; then
+            {
+              echo "### ✨ 更新内容"
+              echo ""
+              printf '%s\n' "$CHANGELOG_SECTION"
+              echo ""
+              echo "---"
+              echo ""
+            } >> release-notes.md
+          fi
+
+          cat <<EOF >> release-notes.md
+          ### 📦 下载指引：不同设备该选哪个版本？
+
+          | 你的设备 / 使用场景 | 推荐下载文件 | 说明 |
+          | :--- | :--- | :--- |
+          | **📱 普通 Android 手机**（推荐） | \`HuyaPure-${TAG}-android.apk\` | 直接安装即可使用，支持多账号、自动领虎粮、全粉丝牌打卡、超粉日智能送礼与应用内更新 |
+          | **🧩 已安装 LSPosed 的 Android 手机** | \`HuyaPure-${TAG}-lsposed.apk\` | 模块版：除后台自动领粮打卡外，额外支持**跳过激励视频广告、屏蔽开屏/直播间广告、彻底禁用 P2P 上传** |
+          | **🍎 iPhone / iPad（iOS 16+）** | \`HuyaPure-${TAG}-ios-unsigned.ipa\` | 通过 **TrollStore（巨魔）/ SideStore / AltStore / Sideloadly** 安装，支持配合系统「快捷指令」每日定时执行 |
+          | **🖥️ 电脑 / NAS / VPS（24h 挂机）** | \`docker-compose.yml\` 或 \`HuyaPure-server-${TAG}-<系统>-<架构>.tar.gz / .zip\` | 纯 Go 网页控制台，支持 Linux / macOS / Windows（\`amd64\` & \`arm64\`）与 Docker 一键部署 |
+
+          > 💡 **小提示**：
+          > - Android 两版包名相互独立（\`com.huya.pure.mobile\` 与 \`com.huya.pure\`），可在同一台手机共存。
+          > - 所有发布文件的 SHA-256 校验值见附件 \`SHA256SUMS.txt\`。
+
+          ---
+          EOF
+          cat release-notes.md
+
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
           name: 虎伴 HuyaPure ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          body_path: release-notes.md
           generate_release_notes: true
           files: release-assets/*

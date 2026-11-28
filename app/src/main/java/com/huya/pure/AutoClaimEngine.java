@@ -100,6 +100,7 @@ final class AutoClaimEngine {
         final long badgeId;
         final String badgeName;
         final String presenterNick;
+        String avatarUrl = "";
         int level;
         int score;
         int nextScore;
@@ -3829,6 +3830,10 @@ final class AutoClaimEngine {
                 long pid = chUid > 0L ? chUid : (badgeUid > 0L && badgeUid != myUid ? badgeUid : 0L);
                 String badgeName = safeStringField(item, "sBadgeName");
                 String nick = safeStringField(item, "sPresenterNickName");
+                String avatarUrl = safeStringField(item, "sPresenterLogo");
+                if (avatarUrl.startsWith("http://")) {
+                    avatarUrl = "https://" + avatarUrl.substring(7);
+                }
                 int level = safeIntField(item, "iBadgeLevel");
                 int score = safeIntField(item, "iScore");
                 int nextScore = safeIntField(item, "iNextScore");
@@ -3936,7 +3941,7 @@ final class AutoClaimEngine {
                 if (pid <= 0L || !seenPids.add(pid)) {
                     continue;
                 }
-                result.add(new BadgeTarget(
+                BadgeTarget bt = new BadgeTarget(
                         pid,
                         badgeId,
                         badgeName,
@@ -3957,7 +3962,9 @@ final class AutoClaimEngine {
                         fansIdentity,
                         faithName,
                         extObj
-                ));
+                );
+                bt.avatarUrl = avatarUrl;
+                result.add(bt);
             }
             Collections.sort(result, (a, b) -> {
                 if (a.extinguished != b.extinguished) {
@@ -4635,6 +4642,9 @@ final class AutoClaimEngine {
                 JSONObject obj = new JSONObject();
                 obj.put("pid", b.pid);
                 obj.put("nick", b.presenterNick != null ? b.presenterNick : "");
+                if (b.avatarUrl != null && !b.avatarUrl.isEmpty()) {
+                    obj.put("avatar", b.avatarUrl);
+                }
                 obj.put("badgeName", b.badgeName != null ? b.badgeName : "");
                 obj.put("level", b.level);
                 obj.put("score", b.score);

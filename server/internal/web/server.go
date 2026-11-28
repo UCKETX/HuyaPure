@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/UCKETX/HuyaPure/server/internal/engine"
@@ -19,6 +20,13 @@ import (
 	"github.com/UCKETX/HuyaPure/server/internal/scheduler"
 	"github.com/UCKETX/HuyaPure/server/internal/store"
 )
+
+type LocalNotification struct {
+	AccountID string `json:"accountId"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	Time      int64  `json:"time"`
+}
 
 //go:embed static/*
 var staticFS embed.FS
@@ -38,6 +46,9 @@ type Deps struct {
 type Server struct {
 	deps      Deps
 	authToken string
+
+	notifMu sync.Mutex
+	notifs  []LocalNotification
 }
 
 func NewServer(deps Deps) *Server {
@@ -46,7 +57,31 @@ func NewServer(deps Deps) *Server {
 		h := sha256.Sum256([]byte("huban-server-auth:" + deps.Password))
 		tok = hex.EncodeToString(h[:])
 	}
-	return &Server{deps: deps, authToken: tok}
+	s := &Server{deps: deps, authToken: tok}
+	if deps.Runner != nil {
+		prev := deps.Runner.OnNotify
+		deps.Runner.OnNotify = func(accountID, title, body string) {
+			s.pushLocalNotification(accountID, title, body)
+			if prev != nil {
+				prev(accountID, title, body)
+			}
+		}
+	}
+	return s
+}
+
+func (s *Server) pushLocalNotification(accountID, title, body string) {
+	s.notifMu.Lock()
+	defer s.notifMu.Unlock()
+	s.notifs = append(s.notifs, LocalNotification{
+		AccountID: accountID,
+		Title:     title,
+		Body:      body,
+		Time:      time.Now().UnixMilli(),
+	})
+	if len(s.notifs) > 30 {
+		s.notifs = s.notifs[len(s.notifs)-30:]
+	}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -70,10 +105,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/accounts/{id}/config", s.requireAuth(s.handleUpdateConfig))
 	mux.HandleFunc("DELETE /api/accounts/{id}", s.requireAuth(s.handleDeleteAccount))
 	mux.HandleFunc("POST /api/accounts/{id}/run", s.requireAuth(s.handleRunAccount))
+	mux.HandleFunc("POST /api/accounts/run-all", s.requireAuth(s.handleRunAllAccounts))
 	mux.HandleFunc("POST /api/accounts/{id}/refresh", s.requireAuth(s.handleRefreshAccount))
 	mux.HandleFunc("POST /api/accounts/{id}/send", s.requireAuth(s.handleManualSend))
 	mux.HandleFunc("PUT /api/notify", s.requireAuth(s.handleSaveNotify))
 	mux.HandleFunc("POST /api/notify/test", s.requireAuth(s.handleTestNotify))
+	mux.HandleFunc("GET /api/notifications/drain", s.requireAuth(s.handleDrainNotifications))
 
 	// Embedded SPA static files
 	sub, err := fs.Sub(staticFS, "static")
@@ -692,6 +729,82 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "notify": cfg})
+}
+
+func (s *Server) handleRunAllAccounts(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Trigger     string `json:"trigger"`
+		OnlyEnabled bool   `json:"onlyEnabled"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	trigger := strings.TrimSpace(body.Trigger)
+	if trigger == "" {
+		trigger = "schedule"
+	}
+
+	type itemResult struct {
+		AccountID       string `json:"accountId"`
+		Label           string `json:"label"`
+		Success         bool   `json:"success"`
+		Message         string `json:"message"`
+		Title           string `json:"title,omitempty"`
+		Body            string `json:"body,omitempty"`
+		CooldownSeconds int    `json:"cooldownSeconds"`
+	}
+
+	ids := s.deps.Store.ListIDs()
+	results := make([]itemResult, 0, len(ids))
+	for _, id := range ids {
+		acc, ok := s.deps.Store.GetClone(id)
+		if !ok || !acc.Credentials.IsValid() {
+			continue
+		}
+		if body.OnlyEnabled && !acc.Config.AutoClaimEnabled {
+			continue
+		}
+		runCtx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+		res, err := s.deps.Runner.RunAccount(runCtx, id, trigger)
+		cancel()
+		if err != nil {
+			results = append(results, itemResult{
+				AccountID: id,
+				Label:     acc.Label,
+				Success:   false,
+				Message:   err.Error(),
+			})
+			continue
+		}
+		s.deps.Scheduler.ScheduleAfterRun(id, res)
+		results = append(results, itemResult{
+			AccountID:       id,
+			Label:           acc.Label,
+			Success:         res.Success,
+			Message:         res.Message,
+			Title:           res.NotifyTitle,
+			Body:            res.NotifyBody,
+			CooldownSeconds: res.CooldownSeconds,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":       true,
+		"count":    len(results),
+		"results":  results,
+		"accounts": s.deps.Store.ListPublic(),
+	})
+}
+
+func (s *Server) handleDrainNotifications(w http.ResponseWriter, _ *http.Request) {
+	s.notifMu.Lock()
+	out := s.notifs
+	s.notifs = nil
+	s.notifMu.Unlock()
+	if out == nil {
+		out = []LocalNotification{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":            true,
+		"notifications": out,
+	})
 }
 
 func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {

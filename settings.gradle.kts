@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "HuyaPure"
-include(":app")
+include(":app", ":mobile-android")

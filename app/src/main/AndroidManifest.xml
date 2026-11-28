@@ -41,12 +41,35 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name">
+            android:label="@string/app_name" />
+
+        <activity-alias
+            android:name=".LauncherLight"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_light"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_light_round"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_dark_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name=".AutoClaimReceiver"

@@ -631,6 +631,79 @@ public final class HubanDialogs {
         return host.handle;
     }
 
+    public static DialogHandle showCustomSheet(
+            Activity activity,
+            Palette p,
+            String title,
+            String subtitle,
+            View body,
+            boolean scrollable,
+            Runnable onDismiss
+    ) {
+        if (isActivityInvalid(activity) || p == null) {
+            return NO_OP_HANDLE;
+        }
+
+        final Dialog dialog = createBaseDialog(activity, true);
+        final ModalHost host = buildModalHost(activity, p, dialog, true, true, onDismiss);
+
+        LinearLayout sheet = createBottomSheetContainer(activity, p);
+        sheet.addView(createDragHandle(activity, p));
+
+        if (title != null && !title.isEmpty()) {
+            TextView titleTv = new TextView(activity);
+            titleTv.setText(title);
+            titleTv.setTextSize(17.5f);
+            titleTv.setTypeface(Typeface.DEFAULT_BOLD);
+            titleTv.setTextColor(p.primaryText);
+            LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            tLp.topMargin = dp(activity, 12);
+            sheet.addView(titleTv, tLp);
+        }
+
+        if (subtitle != null && !subtitle.isEmpty()) {
+            TextView subTv = new TextView(activity);
+            subTv.setText(subtitle);
+            subTv.setTextSize(12.5f);
+            subTv.setTextColor(p.secondaryText);
+            subTv.setLineSpacing(0f, 1.3f);
+            LinearLayout.LayoutParams sLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            sLp.topMargin = dp(activity, 4);
+            sheet.addView(subTv, sLp);
+        }
+
+        if (body != null) {
+            LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            bLp.topMargin = dp(activity, 14);
+            if (scrollable) {
+                MaxHeightScrollView scroll = new MaxHeightScrollView(activity);
+                scroll.setMaxHeightPx(Math.round(getScreenHeight(activity) * 0.68f));
+                scroll.setVerticalScrollBarEnabled(false);
+                scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+                scroll.addView(body, new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.WRAP_CONTENT
+                ));
+                sheet.addView(scroll, bLp);
+            } else {
+                sheet.addView(body, bLp);
+            }
+        }
+
+        host.setBottomSheetContent(sheet);
+        host.show();
+        return host.handle;
+    }
+
     // ── 2b. Custom Bottom Sheet Multi-Select Target & Weight Picker ──────────
 
     private static final class MultiSelectRowHolder {
@@ -1231,22 +1304,6 @@ public final class HubanDialogs {
         readoutTv.setFontFeatureSettings("tnum");
         readoutCard.addView(readoutTv);
 
-        // Quick preset chips row
-        final int[][] presets = new int[][]{
-                {0, 5}, {1, 0}, {8, 0}, {12, 0}, {20, 0}
-        };
-        LinearLayout presetRow = new LinearLayout(activity);
-        presetRow.setOrientation(LinearLayout.HORIZONTAL);
-        presetRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams prLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        prLp.topMargin = dp(activity, 12);
-        sheet.addView(presetRow, prLp);
-
-        final TextView[] presetChips = new TextView[presets.length];
-
         // Dual scrollable columns (Hour 00-23 | Minute 00-59)
         LinearLayout columnsRow = new LinearLayout(activity);
         columnsRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1328,46 +1385,9 @@ public final class HubanDialogs {
         columnsRow.addView(minCol, rightColLp);
 
         int rippleColor = p.isDark ? 0x26FFFFFF : 0x16000000;
-        for (int i = 0; i < presets.length; i++) {
-            final int ph = presets[i][0];
-            final int pm = presets[i][1];
-            TextView chip = new TextView(activity);
-            chip.setText(String.format(Locale.US, "%02d:%02d", ph, pm));
-            chip.setTextSize(12f);
-            chip.setTypeface(Typeface.DEFAULT_BOLD);
-            chip.setGravity(Gravity.CENTER);
-            chip.setFontFeatureSettings("tnum");
-            chip.setClickable(true);
-            chip.setFocusable(true);
-            chip.setPadding(dp(activity, 4), dp(activity, 7), dp(activity, 4), dp(activity, 7));
-            chip.setOnClickListener(v -> {
-                curHour[0] = ph;
-                curMinute[0] = pm;
-                refreshUiRef[0].run();
-                scrollToItem(scrollRefs[0], curHour[0], itemHeightPx, listHeightPx, true);
-                scrollToItem(scrollRefs[1], curMinute[0], itemHeightPx, listHeightPx, true);
-            });
-            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-            );
-            if (i > 0) {
-                chipLp.leftMargin = dp(activity, 6);
-            }
-            presetRow.addView(chip, chipLp);
-            presetChips[i] = chip;
-        }
 
         refreshUiRef[0] = () -> {
             readoutTv.setText(String.format(Locale.US, "%02d : %02d", curHour[0], curMinute[0]));
-            for (int i = 0; i < presets.length; i++) {
-                boolean active = (curHour[0] == presets[i][0] && curMinute[0] == presets[i][1]);
-                TextView chip = presetChips[i];
-                GradientDrawable bg = active
-                        ? createRoundedRect(p.brandTintBg, dp(activity, 99), dp(activity, 1), p.brandStart)
-                        : createRoundedRect(p.subSurface, dp(activity, 99), dp(activity, 1), p.cardBorder);
-                chip.setBackground(new RippleDrawable(ColorStateList.valueOf(rippleColor), bg, null));
-                chip.setTextColor(active ? p.brandText : p.secondaryText);
-            }
             updateTimeColumnHighlight(activity, p, hourItems, curHour[0], rippleColor);
             updateTimeColumnHighlight(activity, p, minuteItems, curMinute[0], rippleColor);
         };

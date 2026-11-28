@@ -1,0 +1,366 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA0100010001000100010001 /* HubanMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100010001000100010001 /* HubanMobileApp.swift */; };
+		AA0100020001000100010001 /* HubanAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100020001000100010001 /* HubanAppIntents.swift */; };
+		AA0100030001000100010001 /* LocalNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100030001000100010001 /* LocalNotificationManager.swift */; };
+		AA0100040001000100010001 /* HubanCoreBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100040001000100010001 /* HubanCoreBridge.swift */; };
+		AA0100050001000100010001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100050001000100010001 /* Models.swift */; };
+		AA0100060001000100010001 /* HubanAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100060001000100010001 /* HubanAPI.swift */; };
+		AA0100070001000100010001 /* HubanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100070001000100010001 /* HubanStore.swift */; };
+		AA0100080001000100010001 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100080001000100010001 /* Theme.swift */; };
+		AA0100090001000100010001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100090001000100010001 /* ContentView.swift */; };
+		AA0100100001000100010001 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100100001000100010001 /* OverviewView.swift */; };
+		AA0100110001000100010001 /* SendTargetsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100110001000100010001 /* SendTargetsSheet.swift */; };
+		AA0100120001000100010001 /* BadgesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100120001000100010001 /* BadgesView.swift */; };
+		AA0100130001000100010001 /* FanBadgePillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100130001000100010001 /* FanBadgePillView.swift */; };
+		AA0100140001000100010001 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100140001000100010001 /* AccountsView.swift */; };
+		AA0100150001000100010001 /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100150001000100010001 /* AddAccountSheet.swift */; };
+		AA0100160001000100010001 /* SafeAuthWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100160001000100010001 /* SafeAuthWebView.swift */; };
+		AA0100170001000100010001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100170001000100010001 /* SettingsView.swift */; };
+		AA0100180001000100010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB0100180001000100010001 /* Assets.xcassets */; };
+		AA0100190001000100010001 /* HubanCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB0100190001000100010001 /* HubanCore.xcframework */; };
+		AA0100210001000100010001 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100210001000100010001 /* AppUpdater.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		BB0100000001000100010001 /* HubanMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HubanMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0100010001000100010001 /* HubanMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubanMobileApp.swift; sourceTree = "<group>"; };
+		BB0100020001000100010001 /* HubanAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubanAppIntents.swift; sourceTree = "<group>"; };
+		BB0100030001000100010001 /* LocalNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalNotificationManager.swift; sourceTree = "<group>"; };
+		BB0100040001000100010001 /* HubanCoreBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubanCoreBridge.swift; sourceTree = "<group>"; };
+		BB0100050001000100010001 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		BB0100060001000100010001 /* HubanAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubanAPI.swift; sourceTree = "<group>"; };
+		BB0100070001000100010001 /* HubanStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubanStore.swift; sourceTree = "<group>"; };
+		BB0100080001000100010001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		BB0100090001000100010001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		BB0100100001000100010001 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		BB0100110001000100010001 /* SendTargetsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendTargetsSheet.swift; sourceTree = "<group>"; };
+		BB0100120001000100010001 /* BadgesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgesView.swift; sourceTree = "<group>"; };
+		BB0100130001000100010001 /* FanBadgePillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanBadgePillView.swift; sourceTree = "<group>"; };
+		BB0100140001000100010001 /* AccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsView.swift; sourceTree = "<group>"; };
+		BB0100150001000100010001 /* AddAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountSheet.swift; sourceTree = "<group>"; };
+		BB0100160001000100010001 /* SafeAuthWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeAuthWebView.swift; sourceTree = "<group>"; };
+		BB0100170001000100010001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		BB0100180001000100010001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0100190001000100010001 /* HubanCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/HubanCore.xcframework; sourceTree = "<group>"; };
+		BB0100200001000100010001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB0100210001000100010001 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CC0100010001000100010001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0100190001000100010001 /* HubanCore.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DD0100000001000100010001 = {
+			isa = PBXGroup;
+			children = (
+				DD0100010001000100010001 /* HubanMobile */,
+				DD0100050001000100010001 /* Frameworks */,
+				DD0100060001000100010001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DD0100010001000100010001 /* HubanMobile */ = {
+			isa = PBXGroup;
+			children = (
+				DD0100020001000100010001 /* App */,
+				DD0100030001000100010001 /* Core */,
+				DD0100040001000100010001 /* Views */,
+				BB0100180001000100010001 /* Assets.xcassets */,
+				BB0100200001000100010001 /* Info.plist */,
+			);
+			path = HubanMobile;
+			sourceTree = "<group>";
+		};
+		DD0100020001000100010001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BB0100010001000100010001 /* HubanMobileApp.swift */,
+				BB0100020001000100010001 /* HubanAppIntents.swift */,
+				BB0100030001000100010001 /* LocalNotificationManager.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		DD0100030001000100010001 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				BB0100040001000100010001 /* HubanCoreBridge.swift */,
+				BB0100050001000100010001 /* Models.swift */,
+				BB0100060001000100010001 /* HubanAPI.swift */,
+				BB0100070001000100010001 /* HubanStore.swift */,
+				BB0100080001000100010001 /* Theme.swift */,
+				BB0100210001000100010001 /* AppUpdater.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		DD0100040001000100010001 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0100090001000100010001 /* ContentView.swift */,
+				BB0100100001000100010001 /* OverviewView.swift */,
+				BB0100110001000100010001 /* SendTargetsSheet.swift */,
+				BB0100120001000100010001 /* BadgesView.swift */,
+				BB0100130001000100010001 /* FanBadgePillView.swift */,
+				BB0100140001000100010001 /* AccountsView.swift */,
+				BB0100150001000100010001 /* AddAccountSheet.swift */,
+				BB0100160001000100010001 /* SafeAuthWebView.swift */,
+				BB0100170001000100010001 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0100050001000100010001 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BB0100190001000100010001 /* HubanCore.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DD0100060001000100010001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BB0100000001000100010001 /* HubanMobile.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE0100010001000100010001 /* HubanMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF0100020001000100010001 /* Build configuration list for PBXNativeTarget "HubanMobile" */;
+			buildPhases = (
+				CC0100020001000100010001 /* Sources */,
+				CC0100010001000100010001 /* Frameworks */,
+				CC0100030001000100010001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HubanMobile;
+			productName = HubanMobile;
+			productReference = BB0100000001000100010001 /* HubanMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EE0100000001000100010001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					EE0100010001000100010001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = FF0100010001000100010001 /* Build configuration list for PBXProject "HubanMobile" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				"zh-Hans",
+				en,
+				Base,
+			);
+			mainGroup = DD0100000001000100010001;
+			productRefGroup = DD0100060001000100010001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE0100010001000100010001 /* HubanMobile */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CC0100030001000100010001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0100180001000100010001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CC0100020001000100010001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0100010001000100010001 /* HubanMobileApp.swift in Sources */,
+				AA0100020001000100010001 /* HubanAppIntents.swift in Sources */,
+				AA0100030001000100010001 /* LocalNotificationManager.swift in Sources */,
+				AA0100040001000100010001 /* HubanCoreBridge.swift in Sources */,
+				AA0100050001000100010001 /* Models.swift in Sources */,
+				AA0100060001000100010001 /* HubanAPI.swift in Sources */,
+				AA0100070001000100010001 /* HubanStore.swift in Sources */,
+				AA0100080001000100010001 /* Theme.swift in Sources */,
+				AA0100090001000100010001 /* ContentView.swift in Sources */,
+				AA0100100001000100010001 /* OverviewView.swift in Sources */,
+				AA0100110001000100010001 /* SendTargetsSheet.swift in Sources */,
+				AA0100120001000100010001 /* BadgesView.swift in Sources */,
+				AA0100130001000100010001 /* FanBadgePillView.swift in Sources */,
+				AA0100140001000100010001 /* AccountsView.swift in Sources */,
+				AA0100150001000100010001 /* AddAccountSheet.swift in Sources */,
+				AA0100160001000100010001 /* SafeAuthWebView.swift in Sources */,
+				AA0100170001000100010001 /* SettingsView.swift in Sources */,
+				AA0100210001000100010001 /* AppUpdater.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FF0100110001000100010001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		FF0100120001000100010001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FF0100210001000100010001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HubanMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.7.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lresolv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.huya.pure.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FF0100220001000100010001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HubanMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.7.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lresolv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.huya.pure.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FF0100010001000100010001 /* Build configuration list for PBXProject "HubanMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF0100110001000100010001 /* Debug */,
+				FF0100120001000100010001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF0100020001000100010001 /* Build configuration list for PBXNativeTarget "HubanMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF0100210001000100010001 /* Debug */,
+				FF0100220001000100010001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EE0100000001000100010001 /* Project object */;
+}

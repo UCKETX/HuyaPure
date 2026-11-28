@@ -2,6 +2,7 @@
 .gradle/
 /build/
 /app/build/
+/mobile-android/build/
 *.apk
 *.aab
 *.ap_
@@ -22,6 +23,13 @@ keystore.properties
 /server/HuyaPure-server
 /server/HuyaPure-server.exe
 /server/data/
+
+# Mobile generated Go native libraries & iOS build artifacts
+/mobile-android/src/main/jniLibs/
+/mobile-ios/Frameworks/
+/mobile-ios/build/
+/mobile-ios/*.xcarchive/
+/mobile-ios/*.ipa
 
 # IDE & Editor files
 /.idea/

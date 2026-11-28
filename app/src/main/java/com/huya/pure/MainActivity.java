@@ -27,6 +27,8 @@ import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -37,10 +39,13 @@ import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.LruCache;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -64,6 +69,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,6 +79,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity {
@@ -88,6 +98,9 @@ public class MainActivity extends Activity {
     private final Map<String, Switch> switchMap = new LinkedHashMap<>();
     private final Map<String, Boolean> defaultMap = new LinkedHashMap<>();
     private final Map<String, Bitmap> nativeBadgeBitmapCache = new LinkedHashMap<>();
+    private final LruCache<String, Bitmap> avatarCircleCache = new LruCache<>(64);
+    private final ExecutorService avatarExecutor = Executors.newFixedThreadPool(3);
+    private final Handler avatarUiHandler = new Handler(Looper.getMainLooper());
     private boolean updatingUi = false;
     private boolean isDarkTheme = false;
     private int currentTab = TAB_TASKS;
@@ -1773,6 +1786,14 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        if (!isChangingConfigurations()) {
+            LauncherIconHelper.syncIfNeeded(this);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (claimPulseAnimator != null) {
@@ -2401,6 +2422,7 @@ public class MainActivity extends Activity {
 
     private View buildBadgeItemView(JSONObject obj) {
         String nick = obj.optString("nick", "");
+        String avatarUrl = obj.optString("avatar", "");
         String badgeName = obj.optString("badgeName", "粉丝牌");
         int level = obj.optInt("level", 0);
         int score = obj.optInt("score", 0);
@@ -2444,10 +2466,15 @@ public class MainActivity extends Activity {
 
         int[] tierColors = resolveBadgeTierColors(level, extinguished == 1);
 
-        // Row 1: [Native/Custom Fan Badge (already includes golden V/V+/V年 icon when SuperFan)] AnchorNick [打卡状态]
+        // Row 1: [Avatar] [Native/Custom Fan Badge (already includes golden V/V+/V年 icon when SuperFan)] AnchorNick [打卡状态]
         LinearLayout topRow = new LinearLayout(this);
         topRow.setOrientation(LinearLayout.HORIZONTAL);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        View avatarView = buildAvatarCircle(avatarUrl, nick.isEmpty() ? badgeName : nick, 30);
+        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(30), dp(30));
+        avLp.rightMargin = dp(8);
+        topRow.addView(avatarView, avLp);
 
         Bitmap nativeBadgeBmp = decodeCachedBase64Bitmap(badgePngB64);
         boolean isSuperFanAny = superFan || sfType > 0 || (fansIdentity >= 1 && fansIdentity <= 4);
@@ -2721,279 +2748,345 @@ public class MainActivity extends Activity {
         final long pid = obj.optLong("pid", 0L);
         final String nick = obj.optString("nick", "");
         final String badgeName = obj.optString("badgeName", "粉丝牌");
-        final int level = obj.optInt("level", 0);
-        final int score = obj.optInt("score", 0);
-        final int nextScore = obj.optInt("nextScore", 0);
-        final int dayScore = obj.optInt("dayScore", 0);
-        final int quota = obj.optInt("quota", 0);
-        final int quotaUsed = obj.optInt("quotaUsed", 0);
-        final int todayIntimacy = dayScore + Math.max(0, quotaUsed);
-        final int guardLevel = obj.optInt("guardLevel", 0);
-        final String guardName = obj.optString("guardName", "");
-        final int guardAccompanyDay = obj.optInt("guardAccompanyDay", 0);
-        final boolean isSuperFan = obj.optBoolean("superFan", false)
-                || obj.optInt("sfType", 0) > 0
-                || obj.optInt("fansIdentity", 0) > 0;
-        final boolean sfDayActive = obj.optBoolean("sfDayActive", false);
-        final int sfDay = obj.optInt("sfDay", 0);
-        final int sfDayScoreTimes = obj.optInt("sfDayScoreTimes", 0);
-        final int sfDayQuotaTimes = obj.optInt("sfDayQuotaTimes", 0);
-        final long nextSfDayEpoch = obj.optLong("nextSfDayEpoch", 0L);
         final String displayName = !nick.isEmpty() ? nick : badgeName;
-
-        int remaining = nextScore > score ? (nextScore - score) : (nextScore > 0 ? nextScore : 0);
-        StringBuilder sb = new StringBuilder();
-        sb.append("粉丝牌：Lv.").append(level).append(" ").append(badgeName);
-        if (pid > 0L) {
-            sb.append("\n主播 UID：").append(pid);
-        }
-        sb.append("\n当前经验：").append(formatNum(score));
-        if (remaining > 0) {
-            sb.append("（升级还差 ").append(formatNum(remaining)).append("）");
-        }
-        sb.append("\n今日亲密度：").append(formatNum(todayIntimacy));
-        if (quota > 0) {
-            sb.append(" / ").append(formatNum(quota));
-        }
-        String guardLabel = resolveGuardLabel(guardLevel, guardName);
-        if (!guardLabel.isEmpty()) {
-            sb.append("\n守护权益：").append(guardLabel);
-            if (guardAccompanyDay > 0) {
-                sb.append("（陪伴 ").append(guardAccompanyDay).append(" 天）");
-            }
-        }
-        if (isSuperFan) {
-            sb.append("\n超粉状态：已开通");
-        }
-        String sfDayDetail = formatSuperFanDayDetail(isSuperFan, sfDayActive, sfDay, sfDayScoreTimes, sfDayQuotaTimes, nextSfDayEpoch);
-        if (!sfDayDetail.isEmpty()) {
-            sb.append("\n超粉日：").append(sfDayDetail);
-        }
-        if (isSendTarget) {
-            sb.append("\n自动送礼：当前已设为赠送目标");
-        }
-
-        HubanDialogs.showMessageModal(
-                this, dialogPalette,
-                displayName,
-                sb.toString(),
-                pid > 0L ? "赠送虎粮" : "知道了",
-                pid > 0L ? () -> showManualSendGiftDialog(pid, displayName) : null,
-                pid > 0L ? "关闭" : null,
-                null,
-                pid > 0L ? "复制 UID" : null,
-                pid > 0L ? () -> {
-                    try {
-                        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                        if (cm != null) {
-                            cm.setPrimaryClip(ClipData.newPlainText("Huya UID", String.valueOf(pid)));
-                            Toast.makeText(this, "已复制主播 UID：" + pid, Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                } : null
-        );
+        showBadgeDetailAndSendSheet(obj, pid, displayName);
     }
 
     private void showManualSendGiftDialog(final long pid, final String anchorNick) {
+        JSONObject matched = null;
+        try {
+            SharedPreferences state = ModulePrefs.openStatePrefs(this);
+            String badgesJson = state.getString(ModulePrefs.STATE_BADGES_JSON, "");
+            if (badgesJson != null && !badgesJson.isEmpty()) {
+                JSONArray arr = new JSONArray(badgesJson);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.optJSONObject(i);
+                    if (o != null && o.optLong("pid", 0L) == pid) {
+                        matched = o;
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        showBadgeDetailAndSendSheet(matched, pid, anchorNick);
+    }
+
+    private void showBadgeDetailAndSendSheet(final JSONObject obj, final long fallbackPid, final String fallbackNick) {
+        final long pid = (obj != null && obj.optLong("pid", 0L) > 0L) ? obj.optLong("pid", 0L) : fallbackPid;
+        final String nick = obj != null ? obj.optString("nick", "") : "";
+        final String badgeName = obj != null ? obj.optString("badgeName", "粉丝牌") : "粉丝牌";
+        final String displayName = !nick.isEmpty()
+                ? nick
+                : (fallbackNick != null && !fallbackNick.isEmpty() ? fallbackNick : (!badgeName.isEmpty() ? badgeName : ("主播 " + pid)));
+        final int level = obj != null ? obj.optInt("level", 0) : 0;
+        final int score = obj != null ? obj.optInt("score", 0) : 0;
+        final int nextScore = obj != null ? obj.optInt("nextScore", 0) : 0;
+        final int dayScore = obj != null ? obj.optInt("dayScore", 0) : 0;
+        final int quota = obj != null ? obj.optInt("quota", 0) : 0;
+        final int quotaUsed = obj != null ? obj.optInt("quotaUsed", 0) : 0;
+        final int todayIntimacy = dayScore + Math.max(0, quotaUsed);
+        final int extinguished = obj != null ? obj.optInt("extinguished", 0) : 0;
+        final int guardLevel = obj != null ? obj.optInt("guardLevel", 0) : 0;
+        final String guardName = obj != null ? obj.optString("guardName", "") : "";
+        final int guardAccompanyDay = obj != null ? obj.optInt("guardAccompanyDay", 0) : 0;
+        final boolean isSuperFan = obj != null && (obj.optBoolean("superFan", false)
+                || obj.optInt("sfType", 0) > 0
+                || obj.optInt("fansIdentity", 0) > 0);
+        final boolean sfDayActive = obj != null && obj.optBoolean("sfDayActive", false);
+        final int sfDay = obj != null ? obj.optInt("sfDay", 0) : 0;
+        final int sfDayScoreTimes = obj != null ? obj.optInt("sfDayScoreTimes", 0) : 0;
+        final long nextSfDayEpoch = obj != null ? obj.optLong("nextSfDayEpoch", 0L) : 0L;
+        final String avatarUrl = obj != null ? obj.optString("avatar", "") : "";
+        final String badgePngB64 = obj != null ? obj.optString("badgePngB64", "") : "";
+
         SharedPreferences state = ModulePrefs.openStatePrefs(this);
-        final int freeBag = state.getInt(ModulePrefs.STATE_FREE_HULIANG_COUNT, -1);
-        final int superBag = state.getInt(ModulePrefs.STATE_SUPER_HULIANG_COUNT, 0);
+        final int freeStock = Math.max(0, state.getInt(ModulePrefs.STATE_FREE_HULIANG_COUNT, 0));
+        final int superStock = Math.max(0, state.getInt(ModulePrefs.STATE_SUPER_HULIANG_COUNT, 0));
         String rawSuperName = state.getString(ModulePrefs.STATE_SUPER_HULIANG_NAME, "");
         final String superLabel = (rawSuperName != null && !rawSuperName.isEmpty()) ? rawSuperName : "超粉虎粮";
 
-        final String[] selectedKind = new String[]{"normal"};
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
+        // 1. Anchor info + Copy UID row (standalone-app style)
+        LinearLayout infoRow = new LinearLayout(this);
+        infoRow.setOrientation(LinearLayout.HORIZONTAL);
+        infoRow.setGravity(Gravity.CENTER_VERTICAL);
+        infoRow.setBackground(createRoundedRect(cSubSurface, 14, 0, 0));
+        infoRow.setPadding(dp(12), dp(10), dp(12), dp(10));
 
-        // Gift type selector row: [免费虎粮] [超粉虎粮]
-        LinearLayout typeRow = new LinearLayout(this);
-        typeRow.setOrientation(LinearLayout.HORIZONTAL);
+        View av = buildAvatarCircle(avatarUrl, displayName, 42);
+        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        avLp.rightMargin = dp(10);
+        infoRow.addView(av, avLp);
 
-        final LinearLayout normalCard = new LinearLayout(this);
-        normalCard.setOrientation(LinearLayout.VERTICAL);
-        normalCard.setGravity(Gravity.CENTER);
-        normalCard.setPadding(dp(10), dp(11), dp(10), dp(11));
-        LinearLayout.LayoutParams ncLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        ncLp.rightMargin = dp(8);
-        normalCard.setLayoutParams(ncLp);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
 
-        final TextView normalTitle = new TextView(this);
-        normalTitle.setText("免费虎粮");
-        normalTitle.setTextSize(14f);
-        normalTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        normalCard.addView(normalTitle);
+        LinearLayout badgeLine = new LinearLayout(this);
+        badgeLine.setOrientation(LinearLayout.HORIZONTAL);
+        badgeLine.setGravity(Gravity.CENTER_VERTICAL);
+        Bitmap nativeBadgeBmp = decodeCachedBase64Bitmap(badgePngB64);
+        if (nativeBadgeBmp != null) {
+            ImageView badgeImg = new ImageView(this);
+            badgeImg.setImageBitmap(nativeBadgeBmp);
+            badgeImg.setAdjustViewBounds(true);
+            badgeImg.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            badgeLine.addView(badgeImg, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(22)));
+        } else if (level > 0) {
+            TextView badgePill = new TextView(this);
+            badgePill.setText("Lv." + level + " " + badgeName);
+            badgePill.setTextSize(11.5f);
+            badgePill.setTypeface(Typeface.DEFAULT_BOLD);
+            badgePill.setTextColor(Color.WHITE);
+            badgePill.setPadding(dp(8), dp(2), dp(8), dp(2));
+            GradientDrawable pillBg = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    resolveBadgeTierColors(level, extinguished == 1));
+            pillBg.setCornerRadius(dp(99));
+            badgePill.setBackground(pillBg);
+            badgeLine.addView(badgePill);
+        }
+        String sfChip = formatSuperFanDayChip(isSuperFan, sfDayActive, sfDay, sfDayScoreTimes, nextSfDayEpoch);
+        if (!sfChip.isEmpty()) {
+            TextView sfPill = createPill(sfChip,
+                    sfDayActive ? (isDarkTheme ? Color.parseColor("#FDE68A") : Color.parseColor("#B45309")) : cBrandText,
+                    sfDayActive ? (isDarkTheme ? Color.parseColor("#422A0E") : Color.parseColor("#FEF3C7")) : cBrandTintBg,
+                    10.5f, true);
+            sfPill.setPadding(dp(7), dp(2), dp(7), dp(2));
+            LinearLayout.LayoutParams sfLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            sfLp.leftMargin = badgeLine.getChildCount() > 0 ? dp(6) : 0;
+            badgeLine.addView(sfPill, sfLp);
+        }
+        if (badgeLine.getChildCount() > 0) {
+            col.addView(badgeLine);
+        }
 
-        TextView normalSub = new TextView(this);
-        normalSub.setText(freeBag >= 0 ? ("背包剩余 " + formatNum(freeBag) + " 个") : "剩余待同步");
-        normalSub.setTextSize(11.5f);
-        normalSub.setTextColor(cSecondaryText);
-        LinearLayout.LayoutParams nsLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        nsLp.topMargin = dp(2);
-        normalSub.setLayoutParams(nsLp);
-        normalCard.addView(normalSub);
-        typeRow.addView(normalCard);
-
-        final LinearLayout superCard = new LinearLayout(this);
-        superCard.setOrientation(LinearLayout.VERTICAL);
-        superCard.setGravity(Gravity.CENTER);
-        superCard.setPadding(dp(10), dp(11), dp(10), dp(11));
-        superCard.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        final TextView superTitle = new TextView(this);
-        superTitle.setText(superLabel);
-        superTitle.setTextSize(14f);
-        superTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        superCard.addView(superTitle);
-
-        TextView superSub = new TextView(this);
-        superSub.setText(superBag > 0 ? ("背包剩余 " + formatNum(superBag) + " 个") : "当前暂无");
-        superSub.setTextSize(11.5f);
-        superSub.setTextColor(cSecondaryText);
-        LinearLayout.LayoutParams ssLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        ssLp.topMargin = dp(2);
-        superSub.setLayoutParams(ssLp);
-        superCard.addView(superSub);
-        typeRow.addView(superCard);
-
-        root.addView(typeRow);
-
-        final Runnable updateTypeStyles = () -> {
-            boolean isNormal = "normal".equals(selectedKind[0]);
-            normalCard.setBackground(createRoundedRect(
-                    isNormal ? cBrandTintBg : cSubSurface, 12, 1, isNormal ? cBrandStart : cCardBorder));
-            normalTitle.setTextColor(isNormal ? cBrandText : cPrimaryText);
-
-            superCard.setBackground(createRoundedRect(
-                    !isNormal ? cBrandTintBg : cSubSurface, 12, 1, !isNormal ? cBrandStart : cCardBorder));
-            superTitle.setTextColor(!isNormal ? cBrandText : cPrimaryText);
-        };
-        updateTypeStyles.run();
-
-        normalCard.setOnClickListener(v -> {
-            selectedKind[0] = "normal";
-            updateTypeStyles.run();
-        });
-        superCard.setOnClickListener(v -> {
-            selectedKind[0] = "super";
-            updateTypeStyles.run();
-        });
-
-        // Quantity input (custom rounded surface, zero native underline)
-        TextView qtyLabel = new TextView(this);
-        qtyLabel.setText("赠送数量（留空或填 0 表示全部送出）");
-        qtyLabel.setTextSize(12.5f);
-        qtyLabel.setTextColor(cSecondaryText);
-        LinearLayout.LayoutParams qlLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        qlLp.topMargin = dp(14);
-        qtyLabel.setLayoutParams(qlLp);
-        root.addView(qtyLabel);
-
-        final EditText countInput = new EditText(this);
-        countInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        countInput.setHint("输入个数，默认 10");
-        countInput.setTextColor(cPrimaryText);
-        countInput.setHintTextColor(cTertiaryText);
-        countInput.setTextSize(15f);
-        countInput.setSingleLine(true);
-        countInput.setBackground(createRoundedRect(cSubSurface, 12, 1, cCardBorder));
-        countInput.setPadding(dp(12), dp(10), dp(12), dp(10));
-        countInput.setText("10");
-        countInput.setSelection(countInput.getText().length());
-        LinearLayout.LayoutParams ciLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        ciLp.topMargin = dp(8);
-        countInput.setLayoutParams(ciLp);
-        root.addView(countInput);
-
-        // Quick preset chips
-        LinearLayout presetRow = new LinearLayout(this);
-        presetRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams prLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        prLp.topMargin = dp(10);
-        presetRow.setLayoutParams(prLp);
-
-        final int[] presetVals = new int[]{1, 10, 50, 0};
-        final String[] presetLabels = new String[]{"1 个", "10 个", "50 个", "全部"};
-        for (int i = 0; i < presetVals.length; i++) {
-            final int val = presetVals[i];
-            TextView chip = createPill(presetLabels[i], cPrimaryText, cSubSurface, 12f, true);
-            chip.setBackground(createRoundedRect(cSubSurface, 99, 1, cCardBorder));
-            chip.setGravity(Gravity.CENTER);
-            chip.setPadding(dp(10), dp(6), dp(10), dp(6));
-            LinearLayout.LayoutParams chLp = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            if (i < presetVals.length - 1) {
-                chLp.rightMargin = dp(6);
+        StringBuilder metaLine = new StringBuilder();
+        if (pid > 0L) {
+            metaLine.append("UID: ").append(pid);
+        }
+        String guardLabel = resolveGuardLabel(guardLevel, guardName);
+        if (!guardLabel.isEmpty()) {
+            if (metaLine.length() > 0) metaLine.append(" · ");
+            metaLine.append(guardLabel);
+            if (guardAccompanyDay > 0) {
+                metaLine.append(" ").append(guardAccompanyDay).append("天");
             }
-            chip.setLayoutParams(chLp);
-            chip.setOnClickListener(v -> {
-                if (val == 0) {
-                    countInput.setText("");
-                    countInput.setHint("全部免费数量");
-                } else {
-                    countInput.setText(String.valueOf(val));
-                    countInput.setSelection(countInput.getText().length());
+        }
+        if (metaLine.length() > 0) {
+            TextView uidTv = new TextView(this);
+            uidTv.setText(metaLine.toString());
+            uidTv.setTextColor(cSecondaryText);
+            uidTv.setTextSize(12f);
+            LinearLayout.LayoutParams uLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            if (badgeLine.getChildCount() > 0) {
+                uLp.topMargin = dp(4);
+            }
+            col.addView(uidTv, uLp);
+        }
+        infoRow.addView(col, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (pid > 0L) {
+            TextView copyBtn = new TextView(this);
+            copyBtn.setText("复制 UID");
+            copyBtn.setTextSize(12f);
+            copyBtn.setTypeface(Typeface.DEFAULT_BOLD);
+            copyBtn.setTextColor(cPrimaryText);
+            copyBtn.setGravity(Gravity.CENTER);
+            copyBtn.setPadding(dp(11), dp(6), dp(11), dp(6));
+            copyBtn.setBackground(createRipple(cCard, 10, 1, cCardBorder));
+            copyBtn.setOnClickListener(v -> {
+                try {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("HuyaUID", String.valueOf(pid)));
+                        Toast.makeText(this, "已复制 UID: " + pid, Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Throwable ignored) {
                 }
             });
-            presetRow.addView(chip);
+            infoRow.addView(copyBtn);
         }
-        root.addView(presetRow);
+        body.addView(infoRow);
 
-        TextView safeHint = new TextView(this);
-        safeHint.setText("严格锁定包裹免费通道，绝不消耗金豆与虎牙币");
-        safeHint.setTextSize(11.5f);
-        safeHint.setTextColor(cTertiaryText);
-        LinearLayout.LayoutParams shLp = new LinearLayout.LayoutParams(
+        // 2. Gift type toggle: 免费虎粮 (N) vs 超粉虎粮 (M)
+        final boolean[] isSuper = new boolean[]{false};
+
+        LinearLayout typeRow = new LinearLayout(this);
+        typeRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams trLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        shLp.topMargin = dp(10);
-        safeHint.setLayoutParams(shLp);
-        root.addView(safeHint);
+        trLp.topMargin = dp(14);
 
-        HubanDialogs.showCustomModal(
-                this, dialogPalette,
-                "向「" + anchorNick + "」送虎粮",
-                root,
-                true,
-                "立即赠送",
-                handle -> {
-                    String raw = countInput.getText() != null ? countInput.getText().toString().trim() : "";
-                    int count = 0;
-                    if (!raw.isEmpty()) {
-                        try {
-                            count = Integer.parseInt(raw);
-                            if (count < 0) {
-                                Toast.makeText(this, "请输入有效的个数", Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                        } catch (NumberFormatException e) {
-                            Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
+        final TextView normalTab = new TextView(this);
+        normalTab.setText("免费虎粮 (" + formatNum(freeStock) + ")");
+        normalTab.setGravity(Gravity.CENTER);
+        normalTab.setTextSize(13f);
+        normalTab.setPadding(0, dp(9), 0, dp(9));
+
+        final TextView superTab = new TextView(this);
+        superTab.setText(superLabel + " (" + formatNum(superStock) + ")");
+        superTab.setGravity(Gravity.CENTER);
+        superTab.setTextSize(13f);
+        superTab.setPadding(0, dp(9), 0, dp(9));
+
+        typeRow.addView(normalTab, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        typeRow.addView(new View(this), new LinearLayout.LayoutParams(dp(8), 1));
+        typeRow.addView(superTab, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        body.addView(typeRow, trLp);
+
+        // 3. Count input + quick chips (送 1 个 / 送 10 个 / 全部送出)
+        final EditText countEt = new EditText(this);
+        countEt.setInputType(InputType.TYPE_CLASS_NUMBER);
+        countEt.setHint("输入赠送数量");
+        countEt.setText("1");
+        countEt.setSelection(countEt.getText().length());
+        countEt.setTextColor(cPrimaryText);
+        countEt.setHintTextColor(cTertiaryText);
+        countEt.setTextSize(15f);
+        countEt.setSingleLine(true);
+        countEt.setBackground(createRoundedRect(cSubSurface, 12, 1, cCardBorder));
+        countEt.setPadding(dp(12), dp(11), dp(12), dp(11));
+        LinearLayout.LayoutParams ceLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        ceLp.topMargin = dp(12);
+        body.addView(countEt, ceLp);
+
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams qrLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        qrLp.topMargin = dp(10);
+
+        String[] qLabels = {"送 1 个", "送 10 个", "全部送出"};
+        for (int i = 0; i < qLabels.length; i++) {
+            final int qIdx = i;
+            TextView qBtn = new TextView(this);
+            qBtn.setText(qLabels[i]);
+            qBtn.setTextSize(12.5f);
+            qBtn.setTypeface(Typeface.DEFAULT_BOLD);
+            qBtn.setTextColor(cPrimaryText);
+            qBtn.setGravity(Gravity.CENTER);
+            qBtn.setPadding(dp(10), dp(9), dp(10), dp(9));
+            qBtn.setBackground(createRipple(cSubSurface, 12, 1, cCardBorder));
+            qBtn.setOnClickListener(v -> {
+                int stock = isSuper[0] ? superStock : freeStock;
+                if (qIdx == 2) {
+                    countEt.setText(stock > 0 ? String.valueOf(stock) : "0");
+                } else {
+                    countEt.setText(qIdx == 0 ? "1" : "10");
+                }
+                countEt.setSelection(countEt.getText().length());
+            });
+            LinearLayout.LayoutParams qLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) qLp.leftMargin = dp(8);
+            quickRow.addView(qBtn, qLp);
+        }
+        body.addView(quickRow, qrLp);
+
+        // 4. Safety note
+        TextView safetyTv = new TextView(this);
+        safetyTv.setText("安全保证：仅消耗包裹免费虎粮（零消费通道），绝不消耗金豆或虎牙币。");
+        safetyTv.setTextColor(cTertiaryText);
+        safetyTv.setTextSize(11.5f);
+        LinearLayout.LayoutParams sfLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sfLp.topMargin = dp(10);
+        body.addView(safetyTv, sfLp);
+
+        // 5. Primary orange gradient CTA button
+        final HubanDialogs.DialogHandle[] holder = new HubanDialogs.DialogHandle[1];
+        final TextView sendBtn = new TextView(this);
+        sendBtn.setText("立即赠送免费虎粮");
+        sendBtn.setTextSize(15f);
+        sendBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        sendBtn.setTextColor(Color.WHITE);
+        sendBtn.setGravity(Gravity.CENTER);
+        GradientDrawable sendGrad = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{cBrandStart, cBrandEnd});
+        sendGrad.setCornerRadius(dp(14));
+        sendBtn.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(0x33FFFFFF), sendGrad, createRoundedRect(Color.WHITE, 14, 0, 0)));
+        LinearLayout.LayoutParams sbLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        sbLp.topMargin = dp(14);
+        body.addView(sendBtn, sbLp);
+
+        Runnable syncTabs = () -> {
+            normalTab.setTypeface(!isSuper[0] ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            normalTab.setTextColor(!isSuper[0] ? cBrandText : cSecondaryText);
+            normalTab.setBackground(createRoundedRect(
+                    !isSuper[0] ? cBrandTintBg : cSubSurface, 12,
+                    !isSuper[0] ? 1 : 1, !isSuper[0] ? cBrandStart : cCardBorder));
+
+            superTab.setTypeface(isSuper[0] ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            superTab.setTextColor(isSuper[0] ? cBrandText : cSecondaryText);
+            superTab.setBackground(createRoundedRect(
+                    isSuper[0] ? cBrandTintBg : cSubSurface, 12,
+                    isSuper[0] ? 1 : 1, isSuper[0] ? cBrandStart : cCardBorder));
+
+            sendBtn.setText(isSuper[0] ? ("立即赠送" + superLabel) : "立即赠送免费虎粮");
+        };
+        normalTab.setOnClickListener(v -> { isSuper[0] = false; syncTabs.run(); });
+        superTab.setOnClickListener(v -> { isSuper[0] = true; syncTabs.run(); });
+        syncTabs.run();
+
+        sendBtn.setOnClickListener(v -> {
+            if (pid <= 0L) {
+                Toast.makeText(this, "缺少主播 UID，无法赠送", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String raw = countEt.getText() != null ? countEt.getText().toString().trim() : "";
+            int count = 0;
+            if (!raw.isEmpty()) {
+                try {
+                    count = Integer.parseInt(raw);
+                    if (count < 0) {
+                        Toast.makeText(this, "请输入有效数量", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                    handle.dismiss();
-                    final String kind = selectedKind[0];
-                    final String giftText = "super".equals(kind) ? superLabel : "虎粮";
-                    Toast.makeText(this, "正在向「" + anchorNick + "」赠送" + giftText + "...", Toast.LENGTH_SHORT).show();
-                    AutoClaimScheduler.sendManualGift(this, pid, anchorNick, kind, count, (ok, msg) -> {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-                        refreshAutoClaimStatus();
-                        Toast.makeText(MainActivity.this,
-                                (msg != null && !msg.isEmpty()) ? msg : (ok ? "赠送成功" : "赠送失败"),
-                                Toast.LENGTH_LONG).show();
-                    });
-                },
-                "取消", null,
-                null, null
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "请输入有效数字", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            if (holder[0] != null) holder[0].dismiss();
+            final String kind = isSuper[0] ? "super" : "normal";
+            final String giftText = isSuper[0] ? superLabel : "虎粮";
+            Toast.makeText(this, "正在向「" + displayName + "」赠送" + giftText + "...", Toast.LENGTH_SHORT).show();
+            AutoClaimScheduler.sendManualGift(this, pid, displayName, kind, count, (ok, msg) -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                refreshAutoClaimStatus();
+                Toast.makeText(MainActivity.this,
+                        (msg != null && !msg.isEmpty()) ? msg : (ok ? "赠送成功" : "赠送失败"),
+                        Toast.LENGTH_LONG).show();
+            });
+        });
+
+        String subtitle;
+        if (obj != null) {
+            int targetTotal = nextScore > score ? nextScore : (nextScore > 0 ? score + nextScore : Math.max(score, 1));
+            subtitle = "手动送礼 · 升级进度 " + formatNum(score) + "/" + formatNum(targetTotal)
+                    + " · 今日亲密度 " + formatNum(todayIntimacy) + (quota > 0 ? ("/" + formatNum(quota)) : "");
+        } else {
+            subtitle = "手动送礼 · 包裹免费通道";
+        }
+
+        holder[0] = HubanDialogs.showCustomSheet(
+                this, dialogPalette,
+                displayName,
+                subtitle,
+                body,
+                false,
+                null
         );
     }
 
@@ -3575,6 +3668,100 @@ public class MainActivity extends Activity {
             d.setStroke(Math.max(1, dp(strokeDp)), strokeColor);
         }
         return d;
+    }
+
+    private Drawable createRipple(int fillColor, int radiusDp, int strokeDp, int strokeColor) {
+        int ripple = isDarkTheme ? Color.parseColor("#22FFFFFF") : Color.parseColor("#14000000");
+        return new RippleDrawable(
+                ColorStateList.valueOf(ripple),
+                createRoundedRect(fillColor, radiusDp, strokeDp, strokeColor),
+                createRoundedRect(Color.WHITE, radiusDp, 0, 0)
+        );
+    }
+
+    private View buildAvatarCircle(String avatarUrl, String name, int sizeDp) {
+        FrameLayout box = new FrameLayout(this);
+        box.setBackground(createRoundedRect(cBrandTintBg, 99, 0, 0));
+
+        TextView initial = new TextView(this);
+        String ch = (name != null && !name.trim().isEmpty()) ? name.trim().substring(0, 1) : "虎";
+        initial.setText(ch);
+        initial.setTextColor(cBrandText);
+        initial.setTextSize(sizeDp >= 42 ? 16f : 13.5f);
+        initial.setTypeface(Typeface.DEFAULT_BOLD);
+        initial.setGravity(Gravity.CENTER);
+        box.addView(initial, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        String url = avatarUrl != null ? avatarUrl.trim() : "";
+        if (url.startsWith("http://")) {
+            url = "https://" + url.substring(7);
+        }
+        if (!url.isEmpty()) {
+            final String finalUrl = url;
+            ImageView iv = new ImageView(this);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            iv.setTag(finalUrl);
+            box.addView(iv, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            Bitmap cached = avatarCircleCache.get(finalUrl);
+            if (cached != null && !cached.isRecycled()) {
+                iv.setImageBitmap(cached);
+                initial.setVisibility(View.GONE);
+            } else {
+                avatarExecutor.execute(() -> {
+                    Bitmap circle = downloadCircleBitmap(finalUrl);
+                    if (circle != null) {
+                        avatarCircleCache.put(finalUrl, circle);
+                        avatarUiHandler.post(() -> {
+                            if (!isFinishing() && !isDestroyed() && finalUrl.equals(iv.getTag())) {
+                                iv.setImageBitmap(circle);
+                                initial.setVisibility(View.GONE);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+        return box;
+    }
+
+    private static Bitmap downloadCircleBitmap(String urlStr) {
+        HttpURLConnection conn = null;
+        try {
+            URL u = new URL(urlStr);
+            conn = (HttpURLConnection) u.openConnection();
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(6000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            conn.setRequestProperty("Referer", "https://www.huya.com/");
+            if (conn.getResponseCode() != 200) {
+                return null;
+            }
+            try (InputStream is = conn.getInputStream()) {
+                Bitmap raw = BitmapFactory.decodeStream(is);
+                if (raw == null) return null;
+                int size = Math.min(raw.getWidth(), raw.getHeight());
+                int outSize = Math.min(160, Math.max(64, size));
+                Bitmap out = Bitmap.createBitmap(outSize, outSize, Bitmap.Config.ARGB_8888);
+                Canvas c = new Canvas(out);
+                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+                float r = outSize / 2f;
+                c.drawCircle(r, r, r, paint);
+                paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+                int left = (raw.getWidth() - size) / 2;
+                int top = (raw.getHeight() - size) / 2;
+                c.drawBitmap(raw, new Rect(left, top, left + size, top + size),
+                        new Rect(0, 0, outSize, outSize), paint);
+                if (raw != out) raw.recycle();
+                return out;
+            }
+        } catch (Throwable ignored) {
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private TextView createPill(String text, int fgColor, int bgColor, float sizeSp, boolean bold) {

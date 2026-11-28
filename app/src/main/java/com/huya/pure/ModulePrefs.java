@@ -59,7 +59,7 @@ public final class ModulePrefs {
     public static final int DEFAULT_SEND_HULIANG_DISTRIBUTE_MODE = DISTRIBUTE_EVEN;
     /** 0 = send all available free 虎粮; >0 = cap per trigger. */
     public static final int DEFAULT_SEND_HULIANG_MAX_COUNT = 0;
-    public static final int DEFAULT_AUTO_CLAIM_HOUR = 8;
+    public static final int DEFAULT_AUTO_CLAIM_HOUR = 1;
     public static final int DEFAULT_AUTO_CLAIM_MINUTE = 0;
     public static final boolean DEFAULT_AUTO_CLAIM_NOTIFY = true;
 

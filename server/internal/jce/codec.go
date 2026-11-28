@@ -608,7 +608,7 @@ func (p *UniPacket) ExtractResponseStruct() (innerStruct []byte, matchedKey stri
 		wupRet = retView.GetInt(0, 0)
 	}
 	var rawPayload []byte
-	for _, cand := range []string{"tRsp", "rsp", "tResp", "resp"} {
+	for _, cand := range []string{"_wup_data", "tRsp", "rsp", "tResp", "resp"} {
 		if v, ok := p.Data[cand]; ok && len(v) > 0 {
 			matchedKey = cand
 			rawPayload = v

@@ -7,8 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" id="themeColorMeta" content="#0c0f14" />
 <title>虎伴 Server · 虎牙云端自动化控制台</title>
-<link rel="icon" type="image/png" href="/logo.png" />
-<link rel="apple-touch-icon" href="/logo.png" />
+<link rel="icon" id="faviconLink" type="image/png" href="/logo.png" />
+<link rel="icon" type="image/png" href="/logo.png" media="(prefers-color-scheme: light)" />
+<link rel="icon" type="image/png" href="/logo-dark.png" media="(prefers-color-scheme: dark)" />
+<link rel="apple-touch-icon" id="appleTouchIconLink" href="/logo.png" />
 <style>
   :root {
     --bg: #0c0f14;
@@ -772,7 +774,7 @@
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="logo-img"><img src="/logo.png" alt="虎伴 Logo" /></div>
+      <div class="logo-img"><img class="brand-logo-img" src="/logo.png" alt="虎伴 Logo" /></div>
       <div class="brand-text">
         <div class="brand-row">
           <span class="brand-name">虎伴 Server</span>
@@ -1087,16 +1089,42 @@ const state = {
   refreshing: false,
 };
 
+function currentLogoSrc() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  return cur === 'dark' ? '/logo-dark.png' : '/logo.png';
+}
+function syncBrandLogos() {
+  const src = currentLogoSrc();
+  document.querySelectorAll('img.brand-logo-img').forEach(img => {
+    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+  });
+  const fav = document.getElementById('faviconLink');
+  if (fav) fav.setAttribute('href', src);
+  const apple = document.getElementById('appleTouchIconLink');
+  if (apple) apple.setAttribute('href', src);
+}
 function syncThemeColorMeta() {
   const cur = document.documentElement.getAttribute('data-theme') || 'dark';
   const meta = document.getElementById('themeColorMeta');
   if (meta) meta.setAttribute('content', cur === 'light' ? '#f6f7f9' : '#0c0f14');
+  syncBrandLogos();
 }
 function initTheme() {
-  const saved = localStorage.getItem('huban_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', saved);
+  const saved = localStorage.getItem('huban_theme');
+  const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  const initial = saved || (mq && mq.matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', initial);
   renderThemeIcon();
   syncThemeColorMeta();
+  if (mq && mq.addEventListener) {
+    mq.addEventListener('change', e => {
+      if (!localStorage.getItem('huban_theme')) {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        renderThemeIcon();
+        syncThemeColorMeta();
+      }
+    });
+  }
 }
 function renderThemeIcon() {
   const cur = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -1297,7 +1325,7 @@ function render() {
   if (!acc) {
     main.innerHTML = `
       <div class="empty-state">
-        <img src="/logo.png" alt="虎伴 Logo" />
+        <img class="brand-logo-img" src="${currentLogoSrc()}" alt="虎伴 Logo" />
         <h2>欢迎使用虎伴 Server</h2>
         <p>登录你的虎牙账号，即可在云端自动领虎粮、粉丝牌打卡、领每日福利并智能囤粮送粮。</p>
         <button class="btn-primary" onclick="openLoginModal()">${ICONS.plus} 添加虎牙账号</button>
@@ -1773,7 +1801,7 @@ function renderAboutTab(main) {
     <div class="panel">
       <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:14px;">
-          <div class="logo-img" style="width:52px;height:52px;border-radius:14px;"><img src="/logo.png" alt="虎伴 Logo" /></div>
+          <div class="logo-img" style="width:52px;height:52px;border-radius:14px;"><img class="brand-logo-img" src="${currentLogoSrc()}" alt="虎伴 Logo" /></div>
           <div>
             <div style="font-size:17px;font-weight:700;">虎伴 Server · HuyaPure</div>
             <div style="font-size:12.5px;color:var(--muted);">纯 Go 轻量级虎牙云端自动化服务 · ${esc(state.version)} · GPL-3.0</div>

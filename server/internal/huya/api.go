@@ -990,27 +990,42 @@ func (a *API) ReportAdClick(ctx context.Context, creds Credentials, reqID string
 	_, _, _ = a.Wup.Call(ctx, "wupui", "onClickCommRewardAdTaskEvent", "tReq", req.Bytes(), adCreds.Cookie)
 }
 
-// AwardBagAdTask invokes wupui.awardCommAdTask.
+// AwardBagAdTask invokes wupui.awardCommAdTask (or wupui.awardCommRewardTask when
+// mpExt["rewardreqtype"] == "1" per HYRewardAdReqType.AwardCommRewardTaskType).
 func (a *API) AwardBagAdTask(ctx context.Context, creds Credentials, adTaskID, reqID string, ext map[string]string, watchSec int32) (bool, string) {
 	adCreds := creds
 	if adCreds.HuYaUA == "" || strings.HasPrefix(adCreds.HuYaUA, "webh5") {
 		adCreds.HuYaUA = DefaultHuYaUA
 	}
-	req := jce.NewWriter()
-	req.WriteStructRaw(0, adCreds.EncodeUserId())
-	req.WriteString(1, adTaskID)
-	req.WriteStructRaw(2, nil) // empty AdSdkInfoReq
 	if ext == nil {
 		ext = map[string]string{}
 	}
-	req.WriteStringMap(3, ext)
 	if watchSec <= 0 {
 		watchSec = 15
 	}
-	req.WriteInt(4, watchSec)
-	req.WriteString(5, reqID)
 
-	rsp, wupRet, err := a.Wup.Call(ctx, "wupui", "awardCommAdTask", "tReq", req.Bytes(), adCreds.Cookie)
+	useRewardTask := strings.TrimSpace(ext["rewardreqtype"]) == "1" || strings.TrimSpace(ext["adTaskRewardReqType"]) == "1"
+	req := jce.NewWriter()
+	fn := "awardCommAdTask"
+	if useRewardTask {
+		// HUYA.AwardCommRewardTaskReq: 0=tId, 1=mpExt, 2=tAdSdkInfo, 3=iAdWatchTime, 4=sReqId
+		fn = "awardCommRewardTask"
+		req.WriteStructRaw(0, adCreds.EncodeUserId())
+		req.WriteStringMap(1, ext)
+		req.WriteStructRaw(2, nil) // empty AdSdkInfoReq
+		req.WriteInt(3, watchSec)
+		req.WriteString(4, reqID)
+	} else {
+		// HUYA.AwardCommAdTaskReq: 0=tId, 1=sAdTaskId, 2=tAdSdkInfo, 3=mpExt, 4=iAdWatchTime, 5=sReqId
+		req.WriteStructRaw(0, adCreds.EncodeUserId())
+		req.WriteString(1, adTaskID)
+		req.WriteStructRaw(2, nil) // empty AdSdkInfoReq
+		req.WriteStringMap(3, ext)
+		req.WriteInt(4, watchSec)
+		req.WriteString(5, reqID)
+	}
+
+	rsp, wupRet, err := a.Wup.Call(ctx, "wupui", fn, "tReq", req.Bytes(), adCreds.Cookie)
 	if err != nil {
 		return false, err.Error()
 	}

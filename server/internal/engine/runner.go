@@ -20,6 +20,8 @@ var cooldownRegex = regexp.MustCompile(`(\d+)\s*秒`)
 type RunResult struct {
 	Success            bool
 	Message            string
+	NotifyTitle        string
+	NotifyBody         string
 	CooldownSeconds    int
 	FreeEarliestExpire int64
 	SFDayActiveSummary string
@@ -31,6 +33,7 @@ type Runner struct {
 	MobileAuth *huya.MobileAuthClient
 	Store      *store.Store
 	Notifier   *notify.Notifier
+	OnNotify   func(accountID, title, body string)
 
 	mu      sync.Mutex
 	running map[string]bool
@@ -120,6 +123,7 @@ func (r *Runner) RunAccount(ctx context.Context, accountID, trigger string) (Run
 		}
 		var adSummary string
 		adClaimed, cooldownSec, adSummary = r.runBagAdHuliang(ctx, creds, hintPID)
+		log.Printf("[Runner:%s] bagAdHuliang claimed=%d cooldown=%ds summary=%q", acc.Label, adClaimed, cooldownSec, adSummary)
 		if adSummary != "" {
 			parts = append(parts, "虎粮："+adSummary)
 		}
@@ -155,6 +159,7 @@ func (r *Runner) RunAccount(ctx context.Context, accountID, trigger string) (Run
 				parts = append(parts, fmt.Sprintf("打卡：%d/%d 枚", doneCnt, checkinTotal))
 			}
 		} else {
+			preserveTodayCheckin(acc, badges, today)
 			parts = append(parts, fmt.Sprintf("打卡：共 %d 枚粉丝牌", checkinTotal))
 		}
 	}
@@ -394,26 +399,33 @@ func (r *Runner) RunAccount(ctx context.Context, accountID, trigger string) (Run
 	})
 
 	// Send notifications if configured.
-	if r.Notifier != nil {
-		notifyCfg := r.Store.GetNotify()
-		displayName := acc.Label
-		if selfProf != nil && strings.TrimSpace(selfProf.NickName) != "" {
-			displayName = strings.TrimSpace(selfProf.NickName)
-		}
-		if cfg.NotifyOnRun {
-			title, body := formatRunNotification(displayName, trigger, parts, bag, sfDaySummary, cooldownSec, time.Now())
-			if errs := r.Notifier.Send(ctx, notifyCfg, title, body); len(errs) > 0 {
+	var notifyTitle, notifyBody string
+	displayName := acc.Label
+	if selfProf != nil && strings.TrimSpace(selfProf.NickName) != "" {
+		displayName = strings.TrimSpace(selfProf.NickName)
+	}
+	if cfg.NotifyOnRun {
+		notifyTitle, notifyBody = formatRunNotification(displayName, trigger, parts, bag, sfDaySummary, cooldownSec, time.Now())
+	} else if cfg.NotifyOnSuperFanDay && sfDaySummary != "" {
+		notifyTitle, notifyBody = formatSuperFanDayOnlyNotification(displayName, sfDaySummary, bag)
+	}
+	if notifyTitle != "" {
+		if r.Notifier != nil {
+			notifyCfg := r.Store.GetNotify()
+			if errs := r.Notifier.Send(ctx, notifyCfg, notifyTitle, notifyBody); len(errs) > 0 {
 				log.Printf("[Runner:%s] notify errors: %v", displayName, errs)
 			}
-		} else if cfg.NotifyOnSuperFanDay && sfDaySummary != "" {
-			title, body := formatSuperFanDayOnlyNotification(displayName, sfDaySummary, bag)
-			_ = r.Notifier.Send(ctx, notifyCfg, title, body)
+		}
+		if r.OnNotify != nil {
+			r.OnNotify(accountID, notifyTitle, notifyBody)
 		}
 	}
 
 	return RunResult{
 		Success:            true,
 		Message:            msg,
+		NotifyTitle:        notifyTitle,
+		NotifyBody:         notifyBody,
 		CooldownSeconds:    cooldownSec,
 		FreeEarliestExpire: earliestExpire,
 		SFDayActiveSummary: sfDaySummary,
@@ -468,6 +480,8 @@ func (r *Runner) RefreshBadgesAndBag(ctx context.Context, accountID string) (*st
 		if selfProf != nil {
 			store.ApplyHuyaProfile(a, selfProf.NickName, selfProf.AvatarURL)
 		}
+		today := time.Now().Format("2006-01-02")
+		preserveTodayCheckin(a, badges, today)
 		a.State.Badges = badges
 		a.State.BadgesUpdateTime = time.Now().UnixMilli()
 		a.State.SFDayActiveSummary = sfSummary
@@ -480,6 +494,40 @@ func (r *Runner) RefreshBadgesAndBag(ctx context.Context, accountID string) (*st
 		}
 		return nil
 	})
+}
+
+// preserveTodayCheckin restores today's known per-badge CheckinState ("success"/"already")
+// onto freshly fetched FanBadge rows so a lightweight sync never regresses checked-in badges
+// back to "待打卡".
+func preserveTodayCheckin(a *store.Account, fresh []*huya.FanBadge, today string) {
+	if a == nil || len(fresh) == 0 {
+		return
+	}
+	sameDay := a.State.TodayCheckinDay == today ||
+		a.State.LastRunDate == today ||
+		(a.State.BadgesUpdateTime > 0 && time.UnixMilli(a.State.BadgesUpdateTime).Format("2006-01-02") == today)
+	if !sameDay {
+		return
+	}
+	prevByPID := make(map[int64]string, len(a.State.Badges))
+	for _, old := range a.State.Badges {
+		if old != nil && (old.CheckinState == "success" || old.CheckinState == "already") {
+			prevByPID[old.PID] = old.CheckinState
+		}
+	}
+	allCheckedToday := a.State.TodayCheckinDay == today &&
+		a.State.TodayCheckinTotal > 0 &&
+		a.State.TodayCheckinCount >= a.State.TodayCheckinTotal
+	for _, b := range fresh {
+		if b == nil || b.CheckinState != "" {
+			continue
+		}
+		if st, ok := prevByPID[b.PID]; ok {
+			b.CheckinState = st
+		} else if allCheckedToday {
+			b.CheckinState = "already"
+		}
+	}
 }
 
 // SyncUserProfile refreshes only the account's Huya nickname and avatar.
@@ -613,7 +661,7 @@ func (r *Runner) runBagAdHuliang(ctx context.Context, creds huya.Credentials, hi
 		}
 	}
 
-	const maxRounds = 12
+	const maxRounds = 30
 	refreshRetries := 0
 	var lastRewardToast string
 	for round := 1; round <= maxRounds; round++ {

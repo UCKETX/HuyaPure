@@ -46,8 +46,8 @@ type AccountConfig struct {
 func DefaultAccountConfig() AccountConfig {
 	return AccountConfig{
 		AutoClaimEnabled:    true,
-		AutoClaimHour:       8,
-		AutoClaimMinute:     30,
+		AutoClaimHour:       1,
+		AutoClaimMinute:     0,
 		AutoAdHuliang:       true,
 		AutoFansCheckin:     true,
 		AutoClaimWelfare:    true,

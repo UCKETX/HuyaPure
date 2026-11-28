@@ -3,6 +3,7 @@ package huya
 import (
 	"encoding/base64"
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/UCKETX/HuyaPure/server/internal/jce"
@@ -129,5 +130,42 @@ func TestNormalizeMobile(t *testing.T) {
 		if got := NormalizeMobile(in); got != want {
 			t.Fatalf("NormalizeMobile(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestCheckUDBRespHeader(t *testing.T) {
+	// Case 1: Nested RespHeader at tag 0 (code=0)
+	rh := jce.NewWriter()
+	rh.WriteInt(0, 1)
+	rh.WriteString(1, "1.0")
+	rh.WriteInt(3, 0)
+	wrapped := jce.NewWriter()
+	wrapped.WriteStructRaw(0, rh.Bytes())
+	if err := checkUDBRespHeader(jce.ParseFields(wrapped.Bytes())); err != nil {
+		t.Fatalf("wrapped code=0 failed: %v", err)
+	}
+
+	// Case 2: Direct top-level RespHeader (as returned by /open/sms/login/code when unwrapped)
+	directOK := jce.NewWriter()
+	directOK.WriteInt(0, 0)
+	directOK.WriteString(1, "1.0")
+	directOK.WriteString(2, "1795790000000")
+	directOK.WriteInt(3, 0)
+	if err := checkUDBRespHeader(jce.ParseFields(directOK.Bytes())); err != nil {
+		t.Fatalf("direct code=0 failed: %v", err)
+	}
+
+	// Case 3: Direct top-level RespHeader with non-zero error code
+	directErr := jce.NewWriter()
+	directErr.WriteString(1, "1.0")
+	directErr.WriteInt(3, 1001)
+	directErr.WriteString(5, "发送过于频繁")
+	if err := checkUDBRespHeader(jce.ParseFields(directErr.Bytes())); err == nil || !strings.Contains(err.Error(), "发送过于频繁") {
+		t.Fatalf("expected error with desc, got: %v", err)
+	}
+
+	// Case 4: Empty struct (all default-zero fields omitted by JCE)
+	if err := checkUDBRespHeader(jce.ParseFields(nil)); err != nil {
+		t.Fatalf("empty default-zero struct failed: %v", err)
 	}
 }

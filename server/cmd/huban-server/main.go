@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,9 +19,10 @@ import (
 	"github.com/UCKETX/HuyaPure/server/internal/scheduler"
 	"github.com/UCKETX/HuyaPure/server/internal/store"
 	"github.com/UCKETX/HuyaPure/server/internal/web"
+	"github.com/UCKETX/HuyaPure/server/pkg/mobilecore"
 )
 
-var Version = "1.6.0-server"
+var Version = "1.7.0-server"
 
 func main() {
 	var (
@@ -28,6 +31,8 @@ func main() {
 		password = flag.String("password", os.Getenv("HUBAN_PASSWORD"), "Optional Web UI access password")
 	)
 	flag.Parse()
+	mobilecore.SetupMobileTimezone()
+	mobilecore.SetupMobileDNS()
 
 	st, err := store.Open(*dataDir)
 	if err != nil {
@@ -75,20 +80,26 @@ func main() {
 		Notifier:   notifier,
 	})
 
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatalf("Failed to listen on %s: %v", *addr, err)
+	}
+	boundPort := ln.Addr().(*net.TCPAddr).Port
+
 	httpSrv := &http.Server{
-		Addr:              *addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		displayAddr := *addr
-		if strings.HasPrefix(displayAddr, ":") {
-			displayAddr = "localhost" + displayAddr
+		displayAddr := ln.Addr().String()
+		if strings.HasPrefix(displayAddr, "[::]:") {
+			displayAddr = fmt.Sprintf("localhost:%d", boundPort)
 		}
+		fmt.Printf("HUBAN_READY_PORT=%d\n", boundPort)
 		log.Printf("虎伴 Server (%s) listening on http://%s (data=%s, auth=%v)",
 			Version, displayAddr, *dataDir, *password != "")
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
 	}()

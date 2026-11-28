@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.7.0
+- **全新推出 Android & iOS 移动端原生 App（开箱即用 · 内置纯 Go 引擎）**：
+  - **Android App（`HuyaPure-v1.7.0-android.apk`）**：零外部依赖纯原生 SDK 界面，内嵌三架构纯 Go 核心引擎，支持多账号独立托管、手机短信/微信扫码/QQ 扫码/虎牙扫码/Cookie 5 种登录、精确闹钟后台定时与本地系统通知 + 6 种外部推送。
+  - **iOS App（`HuyaPure-v1.7.0-ios-unsigned.ipa`）**：纯 SwiftUI 原生客户端，适配 iOS 26/27 **Liquid Glass 液态玻璃**标签栏与顶部胶囊控件，内置系统「快捷指令」自动化动作（`执行虎伴每日任务`），支持 TrollStore / SideStore / AltStore / Sideloadly 安装。
+- **全版本暗色模式自适应 Logo（暖夜星光绒毛风）**：
+  - 新增专为暗色模式重塑光影与提亮面部的暖夜星光小老虎 Logo，自动读取设备深浅色模式实时切换：
+    - **iOS**：支持系统原生 `luminosity: dark` 暗色桌面图标与应用内自适应 `BrandLogo`。
+    - **Android（独立版 & LSPosed 模块版）**：同时提供 `mipmap-night` 应用内实时切换与 `.LauncherLight` / `.LauncherDark` 双启动别名退至后台静默刷新桌面图标，彻底解决部分国产桌面切回浅色时图标缓存不刷新的问题。
+    - **Web 控制台 & README**：自动跟随系统 `prefers-color-scheme` 切换深浅主题、Logo 与 Favicon。
+- **全端自动检查更新与安装包命名优化**：
+  - 为 Android App 与 iOS App 补齐自动更新能力（每 6 小时静默检测 + 顶部更新横幅 + 设置红点 + 手动检查）：Android 支持应用内进度条下载并调起系统安装器，iOS 支持查看更新日志并一键下载 IPA。
+  - 明确区分安装包命名：`HuyaPure-v1.7.0-android.apk`（普通 Android 手机）与 `HuyaPure-v1.7.0-lsposed.apk`（LSPosed 模块版），两端更新器严格隔离资产过滤、绝不误下。
+- **核心引擎与交互体验全面打磨**：
+  - **修复 Android 端 Go 时区回退 UTC 与包裹广告领奖兼容**：内置 `time/tzdata` 并透传设备时区偏移，修复领虎粮/打卡日期偏移与定时提前/延后 8 小时问题；新增 `awardCommRewardTask` 通道支持并提高单轮领取上限。
+  - **修复扫码登录轮询与同步打卡状态重置**：修复微信/QQ/虎牙扫码登录因状态字匹配导致的卡死问题，优化 SafeAuth WebView 授权流程；同步刷新粉丝牌时完整保留当日已打卡状态，不再误回退为「待打卡」。
+  - **全版本粉丝牌与交互升级**：粉丝牌页面统一卡片布局并全端新增主播圆形头像，模块版升级为统一底部详情与手动送粮面板；Android 定时选择器升级为上下滑动惯性滚轮并默认 `01:00`；iOS 「多目标分配策略」与「单次送出上限」升级为原生半屏选择面板；账号页改为点击卡片即切换选中并精简冗余控件。
+
 ## v1.6.0
 - **新增「虎伴 Server」纯 Go 云端网页版（无需 Root / 跨平台自托管）**：
   - 零外部依赖纯 Go 实现完整虎牙 JCE / UniPacket v3 / WUP 协议，单静态二进制内嵌响应式 Web 管理面板，支持 **Linux / macOS / Windows（`amd64` & `arm64`）** 与 **Docker（~15 MB 双架构镜像）** 部署。
